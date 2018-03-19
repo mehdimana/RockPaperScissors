@@ -6,8 +6,10 @@ contract RockPaperScissors is Mortal {
     
     struct PlayerType {
         bool initialized;
+        bytes32 moveHased;
         GameMoves move;
         bool hasDeposited;
+        bool hasRevealed;
         bool hasReclaimed;
     }
     
@@ -22,9 +24,21 @@ contract RockPaperScissors is Mortal {
     // bytes32 represents the hash of a game, GameType contains the game details.     
     mapping (bytes32 => GameType) public games;
     
-    event onClaim(uint ammount, address winner, bytes32 gameHash);
-    event onPlay(GameMoves move, address player, bytes32 gameHash);
-    event onGameCreated(uint stake, address player1, address player2, bytes32 gameHash);
+    event LogClaim(uint ammount, address winner, bytes32 gameHash);
+    event LogPlay(bytes32 move, address player, bytes32 gameHash);
+    event LogRevealed(GameMoves move, address player, bytes32 gameHash);
+    event LogGameCreated(uint stake, address player1, address player2, bytes32 gameHash);
+    
+    /**
+     * create a move hash using 
+     * - this so that the same pwd can be reused across instances of this contract, 
+     * - gameHash so that a pwd can be reused accross games
+     * - owner so that a pwd can be reused accross players
+     * - the move
+     */
+    function calculateMovesHash(bytes32 gameHash, address owner, bytes32 pwd, GameMoves move) public view returns(bytes32 hash) {
+        return keccak256(this, gameHash, owner, pwd, move); 
+    }
     
     /**
      * create a new game
@@ -51,13 +65,16 @@ contract RockPaperScissors is Mortal {
         games[hash].players[player1Address].hasDeposited = false;
         games[hash].players[player1Address].initialized = true;
         games[hash].players[player1Address].hasReclaimed = false; 
+        games[hash].players[player1Address].hasRevealed = false; 
         games[hash].mappingsKeys.push(player1Address); 
         
         games[hash].players[player2Address].hasDeposited = false;
         games[hash].players[player2Address].initialized = true;
         games[hash].players[player2Address].hasReclaimed = false;
+        games[hash].players[player2Address].hasRevealed = false; 
         games[hash].mappingsKeys.push(player2Address); 
-        onGameCreated(stake, player1Address, player2Address, hash);
+        
+        LogGameCreated(stake, player1Address, player2Address, hash);
         
         return hash;
     }
@@ -65,19 +82,47 @@ contract RockPaperScissors is Mortal {
     /**
      * when a game has been created, each player involved can play once (if stake > 0) the player should send the proper amount while playing
      * @param gameHash the game id
-     * @param move this player's move
+     * @param hashMove this player's move (hashed)
      * @return true if successful
      */
-    function play(bytes32 gameHash, GameMoves move) public payable returns(bool success) {
+    function play(bytes32 gameHash, bytes32 hashMove) public payable returns(bool success) {
         require(!games[gameHash].gameFinished); // game should not be finished.
         require(games[gameHash].players[msg.sender].initialized); // only player involved in the game can play.
         require(games[gameHash].stake == msg.value); // player should transfer the proper ammount
         require(!games[gameHash].players[msg.sender].hasDeposited);// player has not yet hasDeposited
-        games[gameHash].players[msg.sender].move = move; //then he plays.
+        games[gameHash].players[msg.sender].moveHased = hashMove; //then he plays.
         games[gameHash].players[msg.sender].hasDeposited = true;
-        onPlay(move, msg.sender, gameHash);
+        LogPlay(hashMove, msg.sender, gameHash);
         return true;
     }
+    
+    /**
+     * when each player has played, each played shall reveal his move.
+     * @param gameHash the game id
+     * @param pwd the password used to hash the move
+     * @param move the move that was hashed.
+     * @return true if successful
+     */
+    function reveal(bytes32 gameHash, bytes32 pwd, GameMoves move) public returns(bool success) {
+        require(!games[gameHash].gameFinished); // game should not be finished.
+        require(games[gameHash].players[msg.sender].initialized); // only player involved in the game can play.
+               
+        require(games[gameHash].players[msg.sender].hasDeposited);// player has hasDeposited
+        address player1 = games[gameHash].mappingsKeys[0];
+        address player2 = games[gameHash].mappingsKeys[1];
+        address otherPlayer = msg.sender == player1 ? player2 : player1;
+        require(games[gameHash].players[otherPlayer].hasDeposited);// the other player has hasDeposited
+        
+        require(!games[gameHash].players[msg.sender].hasRevealed);// player has not yet revealed
+        
+        bytes32 hashMove = calculateMovesHash(gameHash, msg.sender, pwd, move);
+        require(hashMove == games[gameHash].players[msg.sender].moveHased);// check that the pwd and move match with the previously played move.
+        
+        games[gameHash].players[msg.sender].move = move; //then his play is revealed.
+        games[gameHash].players[msg.sender].hasRevealed = true;
+        LogRevealed(move, msg.sender, gameHash);
+        return true;
+    }    
 
     /**
      * if there is a winner after both players have played, the winner can claim 
@@ -88,8 +133,8 @@ contract RockPaperScissors is Mortal {
         require(games[gameHash].players[msg.sender].initialized); // only player involved in the game can request.
         address player1 = games[gameHash].mappingsKeys[0];
         address player2 = games[gameHash].mappingsKeys[1];
-        require(games[gameHash].players[player1].hasDeposited 
-             && games[gameHash].players[player2].hasDeposited); //both players should have played already
+        require(games[gameHash].players[player1].hasRevealed 
+             && games[gameHash].players[player2].hasRevealed); //both players should have played already
         int compareResult = compare(games[gameHash].players[player1].move, games[gameHash].players[player2].move);   
         
         //sender should be the winner (if not do not call us)
@@ -100,7 +145,7 @@ contract RockPaperScissors is Mortal {
         uint ammount = games[gameHash].stake * 2;
         games[gameHash].gameFinished = true;//avoid re-entrency and make sure the stake is send only once
         //games[gameHash].players[msg.sender].hasReclaimed = true; //save gas
-        onClaim(ammount, msg.sender, gameHash); 
+        LogClaim(ammount, msg.sender, gameHash); 
         if (ammount > 0) {
             msg.sender.transfer(ammount);
         }
@@ -118,8 +163,8 @@ contract RockPaperScissors is Mortal {
         
         address player1 = games[gameHash].mappingsKeys[0];
         address player2 = games[gameHash].mappingsKeys[1];
-        require(games[gameHash].players[player1].hasDeposited 
-             && games[gameHash].players[player2].hasDeposited); //both players should have played already
+        require(games[gameHash].players[player1].hasRevealed 
+             && games[gameHash].players[player2].hasRevealed); //both players should have played already
              
         require( 0 == compare(games[gameHash].players[player1].move, games[gameHash].players[player2].move)); //it's a draw
         
@@ -130,7 +175,7 @@ contract RockPaperScissors is Mortal {
             games[gameHash].gameFinished = true; // finish the game when bothe playerss have reclaimed.
         }
         
-        onClaim(ammount, msg.sender, gameHash); 
+        LogClaim(ammount, msg.sender, gameHash); 
         if (ammount > 0) {
             msg.sender.transfer(ammount);
         }

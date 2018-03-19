@@ -10,6 +10,7 @@ contract('RockPaperScissors', function(accounts) {
 	var player1 = accounts[1];
 	var player2 = accounts[2];
 	var other = accounts[3];
+	var pwd = "12345678";
 
 	beforeEach(function() {
 		return RockPaperScissors.new({from: owner})
@@ -95,15 +96,29 @@ contract('RockPaperScissors', function(accounts) {
 		});	
 		
 		it("should allow creation of game with an existing game number if the game is finished", () =>{
+			var moveHashPlayer1;
+			var moveHashPlayer2;
 			return RockPaperScissors.deployed().then( () => {
 				return contractInstance.createGame(1, player1, player2, 100, {from: player1});
 			}).then(txObject => {
 				assert.strictEqual(1, txObject.receipt.status, "transaction was expected to be successfull.");
 				gameHash = txObject.logs[0].args.gameHash;
-				return contractInstance.play(gameHash, 0, {from: player1, value: 100});
+				return contractInstance.calculateMovesHash(gameHash, player1, pwd, 0);
+			}).then(hash => {
+				moveHashPlayer1 = hash;
+				return contractInstance.calculateMovesHash(gameHash, player2, pwd, 1);
+			}).then(hash => {
+				moveHashPlayer2 = hash;
+				return contractInstance.play(gameHash, moveHashPlayer1, {from: player1, value: 100});
 			}).then(txObject => {
 				assert.strictEqual(1, txObject.receipt.status, "transaction was expected to be successfull.");
-				return contractInstance.play(gameHash, 1, {from: player2, value: 100});
+				return contractInstance.play(gameHash, moveHashPlayer2, {from: player2, value: 100});
+			}).then(txObject => {
+				assert.strictEqual(1, txObject.receipt.status, "transaction was expected to be successfull.");
+				return contractInstance.reveal(gameHash, pwd, 0 , {from: player1});
+			}).then(txObject => {
+				assert.strictEqual(1, txObject.receipt.status, "transaction was expected to be successfull.");
+				return contractInstance.reveal(gameHash, pwd, 1, {from: player2});
 			}).then(txObject => {
 				assert.strictEqual(1, txObject.receipt.status, "transaction was expected to be successfull.");
 				return contractInstance.claimAsWinner(gameHash, {from: player2});
@@ -123,21 +138,29 @@ contract('RockPaperScissors', function(accounts) {
 
 	describe("test play", () => {
 		var gameHash;
+		var moveHashPlayer1;
+		var moveHashPlayer2;
 		beforeEach(function() {
 			return RockPaperScissors.deployed().then( () => {
 				return contractInstance.createGame(1, player1, player2, 100, {from: player1});
 			}).then(txObject => {
 				assert.strictEqual(1, txObject.receipt.status, "transaction was expected to be successfull.");
 				gameHash = txObject.logs[0].args.gameHash;
-			})
+				return contractInstance.calculateMovesHash(gameHash, player1, pwd, 0);
+			}).then(hash => {
+				moveHashPlayer1 = hash;
+				return contractInstance.calculateMovesHash(gameHash, player2, pwd, 1);
+			}).then(hash => {
+				moveHashPlayer2 = hash;
+			});
 		});
 
 		it("should allow player1 and player 2 to play", () => {
 			return RockPaperScissors.deployed().then( () => {
-				return contractInstance.play(gameHash, 0, {from: player1, value: 100});
+				return contractInstance.play(gameHash, moveHashPlayer1, {from: player1, value: 100});
 			}).then(txObject => {
 				assert.strictEqual(1, txObject.receipt.status, "transaction was expected to be successfull.");
-				return contractInstance.play(gameHash, 0, {from: player2, value: 100});
+				return contractInstance.play(gameHash, moveHashPlayer2, {from: player2, value: 100});
 			}).then(txObject => {
 				assert.strictEqual(1, txObject.receipt.status, "transaction was expected to be successfull.");
 			})
@@ -145,7 +168,7 @@ contract('RockPaperScissors', function(accounts) {
 
 		it("should allow player2 to play", () => {
 			return RockPaperScissors.deployed().then( () => {
-				return contractInstance.play(gameHash, 1, {from: player2, value: 100});
+				return contractInstance.play(gameHash, moveHashPlayer2, {from: player2, value: 100});
 			}).then(txObject => {
 				assert.strictEqual(1, txObject.receipt.status, "transaction was expected to be successfull.");
 			})
@@ -154,7 +177,7 @@ contract('RockPaperScissors', function(accounts) {
 		it("should not allow unknown player to play", () => {	
 			return RockPaperScissors.deployed().then( () => {
 				return expectedExceptionPromise(function () {
-                    return contractInstance.play(gameHash, 0, {from: other, value: 100});
+                    return contractInstance.play(gameHash, moveHashPlayer1, {from: other, value: 100});
                 }, 3000000);	
 				
 			})
@@ -163,7 +186,7 @@ contract('RockPaperScissors', function(accounts) {
 		it("should not play successfully if stake wrong", () => {	
 			return RockPaperScissors.deployed().then( () => {
 				return expectedExceptionPromise(function () {
-                    return contractInstance.play(gameHash, 0, {from: player1, value: 99});
+                    return contractInstance.play(gameHash, moveHashPlayer1, {from: player1, value: 99});
                 }, 3000000);	
 				
 			})
@@ -171,29 +194,97 @@ contract('RockPaperScissors', function(accounts) {
 
 		it("should not allow player to play 2 times", () => {	
 			return RockPaperScissors.deployed().then( () => {
-				return contractInstance.play(gameHash, 0, {from: player1, value: 100});
+				return contractInstance.play(gameHash, moveHashPlayer1, {from: player1, value: 100});
 			}).then(txObject => {
 				assert.strictEqual(1, txObject.receipt.status, "transaction was expected to be successfull.");
 				return expectedExceptionPromise(function () {
-                    return contractInstance.play(gameHash, 1, {from: player1, value: 100});
+                    return contractInstance.play(gameHash, moveHashPlayer1, {from: player1, value: 100});
                 }, 3000000);
 			})
 		});
 
 	});
 
-	describe("tests game with a winner", () => {
+	describe("tests reveal", () => {
 		var gameHash;
+		var moveHashPlayer1;
+		var moveHashPlayer2;
 		beforeEach(function() {
 			return RockPaperScissors.deployed().then( () => {
 				return contractInstance.createGame(1, player1, player2, 100, {from: player1});
 			}).then(txObject => {
 				assert.strictEqual(1, txObject.receipt.status, "transaction was expected to be successfull.");
 				gameHash = txObject.logs[0].args.gameHash;
+				return contractInstance.calculateMovesHash(gameHash, player1, pwd, 0);
+			}).then(hash => {
+				moveHashPlayer1 = hash;
+				return contractInstance.calculateMovesHash(gameHash, player2, pwd, 1);
+			}).then(hash => {
+				moveHashPlayer2 = hash;
+			})
+		});
+
+		it("should not allow to reveal the wrong move", () => {
+			return RockPaperScissors.deployed().then( () => {
 				return contractInstance.play(gameHash, 0, {from: player1, value: 100});
 			}).then(txObject => {
 				assert.strictEqual(1, txObject.receipt.status, "transaction was expected to be successfull.");
-				return contractInstance.play(gameHash, 1, {from: player2, value: 100});
+				return contractInstance.play(gameHash, 0, {from: player2, value: 100});
+			}).then(txObject => {
+				assert.strictEqual(1, txObject.receipt.status, "transaction was expected to be successfull.");
+				return expectedExceptionPromise(function () {
+                    return contractInstance.reveal(gameHash, pwd, 1 , {from: player1});
+                }, 3000000);
+			})
+		});
+
+		it("should not allow to reveal when the other player has not played", () => {
+			return RockPaperScissors.deployed().then( () => {
+				return contractInstance.play(gameHash, moveHashPlayer1, {from: player1, value: 100});
+			}).then(txObject => {
+				assert.strictEqual(1, txObject.receipt.status, "transaction was expected to be successfull.");
+				return expectedExceptionPromise(function () {
+                    return contractInstance.reveal(gameHash, pwd, 0 , {from: player1});
+                }, 3000000);
+			})
+		});
+
+		it("should not allow to reveal before playing", () => {
+			return RockPaperScissors.deployed().then( () => {
+				return expectedExceptionPromise(function () {
+                    return contractInstance.reveal(gameHash, pwd, 0 , {from: player1});
+                }, 3000000);	
+			});
+		});
+	});
+
+
+	describe("tests game with a winner", () => {
+		var gameHash;
+		var moveHashPlayer1;
+		var moveHashPlayer2;
+		beforeEach(function() {
+			return RockPaperScissors.deployed().then( () => {
+				return contractInstance.createGame(1, player1, player2, 100, {from: player1});
+			}).then(txObject => {
+				assert.strictEqual(1, txObject.receipt.status, "transaction was expected to be successfull.");
+				gameHash = txObject.logs[0].args.gameHash;
+				return contractInstance.calculateMovesHash(gameHash, player1, pwd, 0);
+			}).then(hash => {
+				moveHashPlayer1 = hash;
+				return contractInstance.calculateMovesHash(gameHash, player2, pwd, 1);
+			}).then(hash => {
+				moveHashPlayer2 = hash;
+				return contractInstance.play(gameHash, moveHashPlayer1, {from: player1, value: 100});
+			}).then(txObject => {
+				assert.strictEqual(1, txObject.receipt.status, "transaction was expected to be successfull.");
+				return contractInstance.play(gameHash, moveHashPlayer2, {from: player2, value: 100});
+			}).then(txObject => {
+				assert.strictEqual(1, txObject.receipt.status, "transaction was expected to be successfull.");
+				return contractInstance.reveal(gameHash, pwd, 0 , {from: player1});
+			}).then(txObject => {
+				assert.strictEqual(1, txObject.receipt.status, "transaction was expected to be successfull.");
+				return contractInstance.reveal(gameHash, pwd, 1, {from: player2});
 			}).then(txObject => {
 				assert.strictEqual(1, txObject.receipt.status, "transaction was expected to be successfull.");
 			})
@@ -245,10 +336,22 @@ contract('RockPaperScissors', function(accounts) {
 			}).then(txObject => {
 				assert.strictEqual(1, txObject.receipt.status, "transaction was expected to be successfull.");
 				gameHash = txObject.logs[0].args.gameHash;
-				return contractInstance.play(gameHash, 0, {from: player1, value: 100});
+				return contractInstance.calculateMovesHash(gameHash, player1, pwd, 0);
+			}).then(hash => {
+				moveHashPlayer1 = hash;
+				return contractInstance.calculateMovesHash(gameHash, player2, pwd, 0);
+			}).then(hash => {
+				moveHashPlayer2 = hash;
+				return contractInstance.play(gameHash, moveHashPlayer1, {from: player1, value: 100});
 			}).then(txObject => {
 				assert.strictEqual(1, txObject.receipt.status, "transaction was expected to be successfull.");
-				return contractInstance.play(gameHash, 0, {from: player2, value: 100});
+				return contractInstance.play(gameHash, moveHashPlayer2, {from: player2, value: 100});
+			}).then(txObject => {
+				assert.strictEqual(1, txObject.receipt.status, "transaction was expected to be successfull.");
+				return contractInstance.reveal(gameHash, pwd, 0 , {from: player1});
+			}).then(txObject => {
+				assert.strictEqual(1, txObject.receipt.status, "transaction was expected to be successfull.");
+				return contractInstance.reveal(gameHash, pwd, 0, {from: player2});
 			}).then(txObject => {
 				assert.strictEqual(1, txObject.receipt.status, "transaction was expected to be successfull.");
 			})
@@ -290,13 +393,25 @@ contract('RockPaperScissors', function(accounts) {
 			}).then(txObject => {
 				assert.strictEqual(1, txObject.receipt.status, "transaction was expected to be successfull.");
 				gameHash = txObject.logs[0].args.gameHash;
-				return contractInstance.play(gameHash, player1Move, {from: player1, value: 100});
+				return contractInstance.calculateMovesHash(gameHash, player1, pwd, player1Move);
+			}).then(hash => {
+				moveHashPlayer1 = hash;
+				return contractInstance.calculateMovesHash(gameHash, player2, pwd, player2Move);
+			}).then(hash => {
+				moveHashPlayer2 = hash;
+				return contractInstance.play(gameHash, moveHashPlayer1, {from: player1, value: 100});
 			}).then(txObject => {
 				assert.strictEqual(1, txObject.receipt.status, "transaction was expected to be successfull.");
-				return contractInstance.play(gameHash, player2Move, {from: player2, value: 100});
+				return contractInstance.play(gameHash, moveHashPlayer2, {from: player2, value: 100});
 			}).then(txObject => {
 				assert.strictEqual(1, txObject.receipt.status, "transaction was expected to be successfull.");
-			})
+				return contractInstance.reveal(gameHash, pwd, player1Move , {from: player1});
+			}).then(txObject => {
+				assert.strictEqual(1, txObject.receipt.status, "transaction was expected to be successfull.");
+				return contractInstance.reveal(gameHash, pwd, player2Move, {from: player2});
+			}).then(txObject => {
+				assert.strictEqual(1, txObject.receipt.status, "transaction was expected to be successfull.");
+			});
 		};
 
 		it("should return scissors wins from paper", () => {
@@ -371,11 +486,5 @@ contract('RockPaperScissors', function(accounts) {
 			});
 		});
 	});
-
-
-
-
-
-	
 
 });
