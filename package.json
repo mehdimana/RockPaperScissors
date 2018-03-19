@@ -1,0 +1,25 @@
+{
+  "name": "RockPaperScissors",
+  "version": "0.0.1",
+  "description": "Frontend example using truffle v3",
+  "scripts": {
+    "build": "webpack",
+    "dev": "live-server"
+  },
+  "author": "Mehdi Mana",
+  "license": "",
+  "devDependencies": {
+    "copy-webpack-plugin": "^4.5.1",
+    "create-html": "^4.1.0",
+    "file-loader": "^1.1.11",
+    "live-server": "^1.2.0",
+    "webpack": "^4.1.1",
+    "webpack-cli": "^2.0.10"
+  },
+  "dependencies": {
+    "bluebird": "^3.5.1",
+    "jquery": "^3.3.1",
+    "truffle-contract": "^3.0.4",
+    "web3": "^0.20.5"
+  }
+}
