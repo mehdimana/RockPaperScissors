@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Rock paper scissors demo UI</title>
+  <link href='https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel='stylesheet' type='text/css'>
+  <script src="./app.js"></script>
+</head>
+<body>
+  <h1>Project: Rock paper scissors</h1> 
+
+  <div>Active account 
+    <select id="account-select">
+    </select> 
+    balance is <span id="balance">Loading...</span> Wei</div>
+  <hr>
+
+  <div><h1>Create Game</h1>
+    first player is the active account<br>
+    second player: <select id="second-player-select"> </select> <br>
+    game number:  <input name="gnumber" type="number" placeholder="0" /><br>
+    stake:  <input name="stake" type="number" placeholder="1000" />Wei<br>
+    <button id="create-game">create</button> create a new game.<br>
+  </div>
+  <hr>
+
+  <div> <h1> Current game</h1>
+    Game Hash: <div id="gameHash"></div><br>
+    Move: <select id="move-select"> 
+            <option value="0">Rock</option>
+            <option value="1">Paper</option>
+            <option value="2">Scissors</option>
+          </select> ---
+    password: <input name="pwd"/><br>
+    active account:  <button id="play-buttont">play</button><br>
+    active account:  <button id="reveal-buttont">reveal</button><br>
+    active account:  <button id="claim-winner-buttont">claim as winner</button> <br>
+    active account:  <button id="claim-draw-buttont">claim a draw</button> 
+  </div>
+  <hr>
+  <div id="status"></div>
+</body>
+</html>
