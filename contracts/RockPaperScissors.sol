@@ -1,7 +1,8 @@
 pragma solidity ^0.4.19;
-import "./Owned.sol";
+import "./Mortal.sol";
+import "./Stoppable.sol";
 
-contract RockPaperScissors is Mortal {
+contract RockPaperScissors is Mortal, Stoppable {
     enum GameMoves {Rock, Paper, Scissors}
     
     struct PlayerType {
@@ -50,7 +51,10 @@ contract RockPaperScissors is Mortal {
      * @param stake can be 0.
      * @return the gameHash to be reused when playing or claiming
      */
-    function createGame(uint gameNumber, address player1Address, address player2Address, uint stake) public returns(bytes32 gameHash) {
+    function createGame(uint gameNumber, address player1Address, address player2Address, uint stake) 
+            external 
+            onlyIfrunning 
+            returns(bytes32 gameHash) {
         require(gameNumber != 0); //we reserve the value 0 to check if a structure is empty.
         require(player1Address != address(0));
         require(player2Address != address(0)); // we expect two real players.
@@ -87,7 +91,10 @@ contract RockPaperScissors is Mortal {
      * @param hashMove this player's move (hashed)
      * @return true if successful
      */
-    function play(bytes32 gameHash, bytes32 hashMove) public payable returns(bool success) {
+    function play(bytes32 gameHash, bytes32 hashMove) 
+            external 
+            payable 
+            returns(bool success) {
         require(!games[gameHash].gameFinished); // game should not be finished.
         require(games[gameHash].players[msg.sender].initialized); // only player involved in the game can play.
         require(games[gameHash].stake == msg.value); // player should transfer the proper ammount
@@ -105,7 +112,9 @@ contract RockPaperScissors is Mortal {
      * @param move the move that was hashed.
      * @return true if successful
      */
-    function reveal(bytes32 gameHash, bytes32 pwd, GameMoves move) public returns(bool success) {
+    function reveal(bytes32 gameHash, bytes32 pwd, GameMoves move) 
+            external 
+            returns(bool success) {
         require(!games[gameHash].gameFinished); // game should not be finished.
         require(games[gameHash].players[msg.sender].initialized); // only player involved in the game can play.
                
@@ -144,7 +153,9 @@ contract RockPaperScissors is Mortal {
      * @param gameHash the game's id
      * @return true if successful
      */
-    function claimAsWinner(bytes32 gameHash) public returns(bool success) {
+    function claimAsWinner(bytes32 gameHash)
+            external 
+            returns(bool success) {
         require(games[gameHash].players[msg.sender].initialized); // only player involved in the game can request.
         address player1 = games[gameHash].mappingsKeys[0];
         address player2 = games[gameHash].mappingsKeys[1];
@@ -170,7 +181,9 @@ contract RockPaperScissors is Mortal {
      * @param gameHash the game's id
      * @return true if successful
      */
-    function claimDraw(bytes32 gameHash) public returns(bool success) {
+    function claimDraw(bytes32 gameHash) 
+            external 
+            returns(bool success) {
         require(games[gameHash].players[msg.sender].initialized); // only player involved in the game can request.
         require(!games[gameHash].players[msg.sender].hasReclaimed); // this player has not reclaimed already
         
@@ -201,7 +214,10 @@ contract RockPaperScissors is Mortal {
      * @param player2Move the player 2 move
      * @return -1 if player1Move wins, 0 if draw, +1 if player2Move wins
      */
-    function compare(GameMoves player1Move, GameMoves player2Move) pure private returns(int winner){
+    function compare(GameMoves player1Move, GameMoves player2Move) 
+            pure 
+            private 
+            returns(int winner){
         //split in multiple ifs to reduce mental load.
         if (player1Move == player2Move)
             return 0;

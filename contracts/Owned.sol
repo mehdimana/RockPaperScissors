@@ -3,6 +3,8 @@ pragma solidity ^0.4.19;
 contract Owned {
     address private owner;
     
+    event LogOwnerChange(address owner, address newOwner);
+    
     function Owned() public {
         owner = msg.sender;
         assert(owner != address(0));
@@ -18,12 +20,8 @@ contract Owned {
     }
     
     function setOwner(address newOwner) public accessibleByOwnerOnly {
+        assert(newOwner != address(0));
+        LogOwnerChange(owner, newOwner);
         owner = newOwner;
-    }
-}
-
-contract Mortal is Owned {
-    function kill() public accessibleByOwnerOnly {
-        selfdestruct(getOwner());
     }
 }
