@@ -6,7 +6,7 @@ contract RockPaperScissors is Mortal, Stoppable {
     enum GameMoves {Rock, Paper, Scissors}
     
     struct PlayerType {
-        bool initialized;
+        address playerAddress;
         bytes32 moveHased;
         GameMoves move;
         bool hasDeposited;
@@ -14,23 +14,18 @@ contract RockPaperScissors is Mortal, Stoppable {
         bool hasReclaimed;
     }
     
-    struct GameType {
-        uint gameNumber;
-        mapping (address => PlayerType) players;
-        address[] mappingsKeys;// players addresses
-        uint stake; //the amount each player should transfer
-        bool gameFinished; //true when the winner has reclaimed his money
-    } 
-
-    // bytes32 represents the hash of a game, GameType contains the game details.     
-    mapping (bytes32 => GameType) public games;
+    PlayerType player1;
+    PlayerType player2;
     
-    event LogWinnerRevealed(address winner, address loser, bytes32 gameHash);
-    event LogDrawRevealed(address player1, address player2, bytes32 gameHash);
-    event LogClaim(uint ammount, address winner, bytes32 gameHash);
-    event LogPlay(bytes32 move, address player, bytes32 gameHash);
-    event LogRevealed(GameMoves move, address player, bytes32 gameHash);
-    event LogGameCreated(uint stake, address player1, address player2, bytes32 gameHash);
+    uint stake; //the amount each player should transfer
+    bool gameFinished; //true when the winner has reclaimed his money
+
+    event LogWinnerRevealed(address winner, address loser, address contractAddress);
+    event LogDrawRevealed(address player1, address player2, address contractAddress);
+    event LogClaim(uint ammount, address winner, address contractAddress);
+    event LogPlay(bytes32 move, address player, address contractAddress);
+    event LogRevealed(GameMoves move, address player, address contractAddress);
+    event LogGameCreated(uint stake, address player1, address player2, address contractAddress);
     
     /**
      * create a move hash using 
@@ -39,50 +34,58 @@ contract RockPaperScissors is Mortal, Stoppable {
      * - owner so that a pwd can be reused accross players
      * - the move
      */
-    function calculateMovesHash(bytes32 gameHash, address owner, bytes32 pwd, GameMoves move) public view returns(bytes32 hash) {
-        return keccak256(this, gameHash, owner, pwd, move); 
+    function calculateMovesHash(address owner, bytes32 pwd, GameMoves move) public view returns(bytes32 hash) {
+        return keccak256(this, owner, pwd, move); 
     }
     
     /**
-     * create a new game
-     * @param gameNumber should be unique per gameNumber
+     * constructor: create a new game
      * @param player1Address first player
      * @param player2Address second player
      * @param stake can be 0.
-     * @return the gameHash to be reused when playing or claiming
      */
-    function createGame(uint gameNumber, address player1Address, address player2Address, uint stake) 
-            external 
+    function RockPaperScissors(address player1Address, address player2Address, uint _stake) 
+            public 
             onlyIfrunning 
-            returns(bytes32 gameHash) {
-        require(gameNumber != 0); //we reserve the value 0 to check if a structure is empty.
+            accessibleByOwnerOnly{
         require(player1Address != address(0));
         require(player2Address != address(0)); // we expect two real players.
-        require(player1Address != player2Address);
-        require(msg.sender == player1Address || msg.sender == player2Address); // we expect one of the player to create the game.
+        require(player1Address != player2Address); // we expect # players
+        require(gameFinished == true); // check that this game is not finished.
+  
+        stake = _stake;
+        //gameFinished = false; //save gas
+        player1.playerAddress = player1Address;
+        //players1.hasDeposited = false; //save gas
+        //players1.hasReclaimed = false;  //save gas
+        //players1.hasRevealed = false;  //save gas
         
-        bytes32 hash = keccak256(gameNumber, player2Address, player2Address, stake);
-        require(games[hash].gameNumber == 0 || games[hash].gameFinished == true); // check that this game does not exist already or is finished.
+        player2.playerAddress = player2Address;
+        //players2.hasDeposited = false; //save gas
+       // players2.hasReclaimed = false; //save gas
+        //players2.hasRevealed = false;  //save gas
         
-        games[hash].gameNumber = gameNumber;
-        games[hash].stake = stake;
-        games[hash].gameFinished = false; 
-        
-        games[hash].players[player1Address].hasDeposited = false;
-        games[hash].players[player1Address].initialized = true;
-        games[hash].players[player1Address].hasReclaimed = false; 
-        games[hash].players[player1Address].hasRevealed = false; 
-        games[hash].mappingsKeys.push(player1Address); 
-        
-        games[hash].players[player2Address].hasDeposited = false;
-        games[hash].players[player2Address].initialized = true;
-        games[hash].players[player2Address].hasReclaimed = false;
-        games[hash].players[player2Address].hasRevealed = false; 
-        games[hash].mappingsKeys.push(player2Address); 
-        
-        LogGameCreated(stake, player1Address, player2Address, hash);
-        
-        return hash;
+        LogGameCreated(stake, player1Address, player2Address, this);
+    }
+    
+    function getCallingPlayer(address playerAddress) internal returns(PlayerType actualPlayer) {
+        if (player1.playerAddress == msg.sender) {
+            return player1;
+        } else if (player2.playerAddress == msg.sender) {
+            return player2;
+        } else {
+            assert(false); //not expected.
+        }
+    }
+    
+    function getOtherPlayer(address playerAddress) internal returns(PlayerType actualPlayer) {
+        if (player1.playerAddress == msg.sender) {
+            return player2;
+        } else if (player2.playerAddress == msg.sender) {
+            return player1;
+        } else {
+            assert(false); //not expected.
+        }
     }
     
     /**
@@ -95,13 +98,15 @@ contract RockPaperScissors is Mortal, Stoppable {
             external 
             payable 
             returns(bool success) {
-        require(!games[gameHash].gameFinished); // game should not be finished.
-        require(games[gameHash].players[msg.sender].initialized); // only player involved in the game can play.
-        require(games[gameHash].stake == msg.value); // player should transfer the proper ammount
-        require(!games[gameHash].players[msg.sender].hasDeposited);// player has not yet hasDeposited
-        games[gameHash].players[msg.sender].moveHased = hashMove; //then he plays.
-        games[gameHash].players[msg.sender].hasDeposited = true;
-        LogPlay(hashMove, msg.sender, gameHash);
+        require(!gameFinished); // game should not be finished.
+        require(stake == msg.value); // player should transfer the proper ammount
+        
+        PlayerType memory actualPlayer = getCallingPlayer(msg.sender); //get the current player
+        require(!actualPlayer.hasDeposited);// player has not yet hasDeposited
+        
+        actualPlayer.moveHased = hashMove; //then he plays.
+        actualPlayer.hasDeposited = true;
+        LogPlay(hashMove, msg.sender, this);
         return true;
     }
     
@@ -115,33 +120,30 @@ contract RockPaperScissors is Mortal, Stoppable {
     function reveal(bytes32 gameHash, bytes32 pwd, GameMoves move) 
             external 
             returns(bool success) {
-        require(!games[gameHash].gameFinished); // game should not be finished.
-        require(games[gameHash].players[msg.sender].initialized); // only player involved in the game can play.
-               
-        require(games[gameHash].players[msg.sender].hasDeposited);// player has hasDeposited
-        address player1 = games[gameHash].mappingsKeys[0];
-        address player2 = games[gameHash].mappingsKeys[1];
-        address otherPlayer = msg.sender == player1 ? player2 : player1;
-        require(games[gameHash].players[otherPlayer].hasDeposited);// the other player has hasDeposited
+        require(!gameFinished); // game should not be finished.
+        PlayerType memory actualPlayer = getCallingPlayer(msg.sender); //get the current player
+        require(actualPlayer.hasDeposited);// player has hasDeposited
         
-        require(!games[gameHash].players[msg.sender].hasRevealed);// player has not yet revealed
+        PlayerType memory otherPlayer = getOtherPlayer(msg.sender);
+        require(otherPlayer.hasDeposited);// the other player has hasDeposited
+        require(!actualPlayer.hasRevealed);// player has not yet revealed
         
-        bytes32 hashMove = calculateMovesHash(gameHash, msg.sender, pwd, move);
-        require(hashMove == games[gameHash].players[msg.sender].moveHased);// check that the pwd and move match with the previously played move.
+        bytes32 hashMove = calculateMovesHash(msg.sender, pwd, move);
+        require(hashMove == actualPlayer.moveHased);// check that the pwd and move match with the previously played move.
         
-        games[gameHash].players[msg.sender].move = move; //then his play is revealed.
-        games[gameHash].players[msg.sender].hasRevealed = true;
-        LogRevealed(move, msg.sender, gameHash);
+        actualPlayer.move = move; //then his play is revealed.
+        actualPlayer.hasRevealed = true;
+        LogRevealed(move, msg.sender, this);
         
         //check if we have a winner
-        if (games[gameHash].players[otherPlayer].hasRevealed) {
-            int compareResult = compare(games[gameHash].players[player1].move, games[gameHash].players[player2].move);
+        if (otherPlayer.hasRevealed) {
+            int compareResult = compare(player1.move, player2.move);
             if (compareResult == -1) { //player1 winner
-                LogWinnerRevealed(player1, player2, gameHash);
+                LogWinnerRevealed(player1.playerAddress, player2.playerAddress, this);
             } else if (compareResult == 1) { //player2 is a winner
-                LogWinnerRevealed(player2, player1, gameHash);
+                LogWinnerRevealed(player2.playerAddress, player1.playerAddress, this);
             } else { //a draw
-                LogDrawRevealed(player1, player2, gameHash);
+                LogDrawRevealed(player1.playerAddress, player2.playerAddress, this);
             }
         }
         
@@ -156,22 +158,18 @@ contract RockPaperScissors is Mortal, Stoppable {
     function claimAsWinner(bytes32 gameHash)
             external 
             returns(bool success) {
-        require(games[gameHash].players[msg.sender].initialized); // only player involved in the game can request.
-        address player1 = games[gameHash].mappingsKeys[0];
-        address player2 = games[gameHash].mappingsKeys[1];
-        require(games[gameHash].players[player1].hasRevealed 
-             && games[gameHash].players[player2].hasRevealed); //both players should have played already
-        require(games[gameHash].stake > 0); // don't claim if no stake
+        require(player1.hasRevealed 
+             && player2.hasRevealed); //both players should have played already
+        require(stake > 0); // don't claim if no stake
         
-        int compareResult = compare(games[gameHash].players[player1].move, games[gameHash].players[player2].move);   
+        int compareResult = compare(player1.move, player2.move);   
         //sender should be the winner (if not do not call us)
-        require((compareResult == -1 && player1 == msg.sender) //sender is player1 and has Won
-            ||  (compareResult == 1 && player2 == msg.sender)); //sender is player2 and has won
+        require((compareResult == -1 && player1.playerAddress == msg.sender) //sender is player1 and has Won
+            ||  (compareResult == 1 && player2.playerAddress == msg.sender)); //sender is player2 and has won
   
-        uint ammount = games[gameHash].stake * 2; // this is >0 since previous require
-        games[gameHash].gameFinished = true;//avoid re-entrency and make sure the stake is send only once
-        //games[gameHash].players[msg.sender].hasReclaimed = true; //save gas
-        LogClaim(ammount, msg.sender, gameHash); 
+        uint ammount = stake * 2; // this is >0 since previous require
+        gameFinished = true;//avoid re-entrency and make sure the stake is send only once
+        LogClaim(ammount, msg.sender, this); 
         msg.sender.transfer(ammount);
         return true;
     }
@@ -184,24 +182,23 @@ contract RockPaperScissors is Mortal, Stoppable {
     function claimDraw(bytes32 gameHash) 
             external 
             returns(bool success) {
-        require(games[gameHash].players[msg.sender].initialized); // only player involved in the game can request.
-        require(!games[gameHash].players[msg.sender].hasReclaimed); // this player has not reclaimed already
         
-        address player1 = games[gameHash].mappingsKeys[0];
-        address player2 = games[gameHash].mappingsKeys[1];
-        require(games[gameHash].players[player1].hasRevealed 
-             && games[gameHash].players[player2].hasRevealed); //both players should have played already
+        
+        PlayerType memory actualPlayer = getCallingPlayer(msg.sender); //get the current player
+        require(!actualPlayer.hasReclaimed); // this player has not reclaimed already
+        PlayerType memory otherPlayer = getOtherPlayer(msg.sender);
+        require(actualPlayer.hasRevealed 
+             && otherPlayer.hasRevealed); //both players should have played already
              
-        require( 0 == compare(games[gameHash].players[player1].move, games[gameHash].players[player2].move)); //it's a draw
-        require(games[gameHash].stake > 0); // don't claim if no stake
-        uint ammount = games[gameHash].stake;
-        games[gameHash].players[msg.sender].hasReclaimed = true; //avoir re-entrency
-        address otherPlayer = msg.sender == player1 ? player2 : player1;
-        if (games[gameHash].players[otherPlayer].hasReclaimed) {
-            games[gameHash].gameFinished = true; // finish the game when bothe playerss have reclaimed.
+        require( 0 == compare(actualPlayer.move, otherPlayer.move)); //it's a draw
+        require(stake > 0); // don't claim if no stake
+        uint ammount = stake;
+        actualPlayer.hasReclaimed = true; //avoir re-entrency
+        if (otherPlayer.hasReclaimed) {
+            gameFinished = true; // finish the game when bothe playerss have reclaimed.
         }
         
-        LogClaim(ammount, msg.sender, gameHash); 
+        LogClaim(ammount, msg.sender, this); 
         msg.sender.transfer(ammount);
         
         return true;
