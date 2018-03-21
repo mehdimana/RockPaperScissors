@@ -24,6 +24,8 @@ contract RockPaperScissors is Mortal {
     // bytes32 represents the hash of a game, GameType contains the game details.     
     mapping (bytes32 => GameType) public games;
     
+    event LogWinnerRevealed(address winner, address loser, bytes32 gameHash);
+    event LogDrawRevealed(address player1, address player2, bytes32 gameHash);
     event LogClaim(uint ammount, address winner, bytes32 gameHash);
     event LogPlay(bytes32 move, address player, bytes32 gameHash);
     event LogRevealed(GameMoves move, address player, bytes32 gameHash);
@@ -121,6 +123,19 @@ contract RockPaperScissors is Mortal {
         games[gameHash].players[msg.sender].move = move; //then his play is revealed.
         games[gameHash].players[msg.sender].hasRevealed = true;
         LogRevealed(move, msg.sender, gameHash);
+        
+        //check if we have a winner
+        if (games[gameHash].players[otherPlayer].hasRevealed) {
+            int compareResult = compare(games[gameHash].players[player1].move, games[gameHash].players[player2].move);
+            if (compareResult == -1) { //player1 winner
+                LogWinnerRevealed(player1, player2, gameHash);
+            } else if (compareResult == 1) { //player2 is a winner
+                LogWinnerRevealed(player2, player1, gameHash);
+            } else { //a draw
+                LogDrawRevealed(player1, player2, gameHash);
+            }
+        }
+        
         return true;
     }    
 
@@ -135,20 +150,18 @@ contract RockPaperScissors is Mortal {
         address player2 = games[gameHash].mappingsKeys[1];
         require(games[gameHash].players[player1].hasRevealed 
              && games[gameHash].players[player2].hasRevealed); //both players should have played already
-        int compareResult = compare(games[gameHash].players[player1].move, games[gameHash].players[player2].move);   
+        require(games[gameHash].stake > 0); // don't claim if no stake
         
+        int compareResult = compare(games[gameHash].players[player1].move, games[gameHash].players[player2].move);   
         //sender should be the winner (if not do not call us)
         require((compareResult == -1 && player1 == msg.sender) //sender is player1 and has Won
             ||  (compareResult == 1 && player2 == msg.sender)); //sender is player2 and has won
-        
-
-        uint ammount = games[gameHash].stake * 2;
+  
+        uint ammount = games[gameHash].stake * 2; // this is >0 since previous require
         games[gameHash].gameFinished = true;//avoid re-entrency and make sure the stake is send only once
         //games[gameHash].players[msg.sender].hasReclaimed = true; //save gas
         LogClaim(ammount, msg.sender, gameHash); 
-        if (ammount > 0) {
-            msg.sender.transfer(ammount);
-        }
+        msg.sender.transfer(ammount);
         return true;
     }
     
@@ -167,7 +180,7 @@ contract RockPaperScissors is Mortal {
              && games[gameHash].players[player2].hasRevealed); //both players should have played already
              
         require( 0 == compare(games[gameHash].players[player1].move, games[gameHash].players[player2].move)); //it's a draw
-        
+        require(games[gameHash].stake > 0); // don't claim if no stake
         uint ammount = games[gameHash].stake;
         games[gameHash].players[msg.sender].hasReclaimed = true; //avoir re-entrency
         address otherPlayer = msg.sender == player1 ? player2 : player1;
@@ -176,9 +189,8 @@ contract RockPaperScissors is Mortal {
         }
         
         LogClaim(ammount, msg.sender, gameHash); 
-        if (ammount > 0) {
-            msg.sender.transfer(ammount);
-        }
+        msg.sender.transfer(ammount);
+        
         return true;
         
     }

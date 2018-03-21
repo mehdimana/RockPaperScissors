@@ -81,7 +81,19 @@ const watchEvents = function() {
             return deployed.LogGameCreated({from: account});
          }).then( event => {
             watchEvent(event);
+            return deployed.LogWinnerRevealed({from: account});
+         }).then( event => {
+            watchEvent(event);
+            return deployed.LogDrawRevealed({from: account});
+         }).then( event => {
+            watchEvent(event);
          });
+}
+
+var statusIndex=1;
+
+const updateStatus = function(text) {
+  $("#status").html(statusIndex++ + "- " + text + "<br>" + $("#status").html());
 }
 
 const watchEvent = function(event) {
@@ -91,6 +103,8 @@ const watchEvent = function(event) {
       return;
     }
     console.log("Event received: " + result.event);
+    updateStatus("Event received: " + result.event);
+    updateStatus(result.args.toSource());
     console.log(result.args);
     if (result.event == "LogGameCreated") {
       $("#gameHash").html(result.args.gameHash);
@@ -112,9 +126,9 @@ const createGame = function() {
           return web3.eth.getTransactionReceiptPromise(txHash);
         }).then(txObject => {
           if (txObject.status == "0x01" || txObject.status == 1) {
-            $("#status").html("game created successsfuly.");
+            updateStatus("game created successsfuly.");
           } else {
-            $("#status").html("error creating game.");
+            updateStatus("error creating game.");
             console.error(txObject);
           }
          }).catch(console.error);
@@ -135,9 +149,9 @@ const playGame = function() {
           return web3.eth.getTransactionReceiptPromise(txHash);
         }).then(txObject => {
           if (txObject.status == "0x01" || txObject.status == 1) {
-            $("#status").html("Play successfull.");
+            updateStatus("Play successfull.");
           } else {
-            $("#status").html("Error occured while playing.");
+            updateStatus("Error occured while playing.");
             console.error(txObject);
           }
         }).catch(console.error);
@@ -164,9 +178,9 @@ const reveal = function() {
     return web3.eth.getTransactionReceiptPromise(txHash);
   }).then(txObject => {
     if (txObject.status == "0x01" || txObject.status == 1) {
-      $("#status").html("move revealed successfuly.");
+      updateStatus("move revealed successfuly.");
     } else {
-      $("#status").html("error revealing move.");
+      updateStatus("error revealing move.");
       console.error(txObject);
     }
   }).catch(console.error);
@@ -180,9 +194,9 @@ const claimDraw = function() {
     return web3.eth.getTransactionReceiptPromise(txHash);
   }).then(txObject => {
     if (txObject.status == "0x01" || txObject.status == 1) {
-      $("#status").html("claimed successfuly.");
+      updateStatus("claimed successfuly.");
     } else {
-      $("#status").html("error claiming.");
+      updateStatus("error claiming.");
       console.error(txObject);
     }
   }).catch(console.error);
@@ -196,9 +210,9 @@ const claimAsWinner = function() {
     return web3.eth.getTransactionReceiptPromise(txHash);
   }).then(txObject => {
     if (txObject.status == "0x01" || txObject.status == 1) {
-      $("#status").html("claimed successsfuly.");
+      updateStatus("claimed successsfuly.");
     } else {
-      $("#status").html("error claiming.");
+      updateStatus("error claiming.");
       console.error(txObject);
     }
   }).catch(console.error);
