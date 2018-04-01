@@ -1,4 +1,4 @@
-pragma solidity ^0.4.20;
+pragma solidity ^0.4.21;
 
 contract Owned {
     address private owner;
@@ -21,7 +21,7 @@ contract Owned {
     
     function setOwner(address newOwner) public accessibleByOwnerOnly {
         assert(newOwner != address(0));
-        LogOwnerChange(owner, newOwner);
+        emit LogOwnerChange(owner, newOwner);
         owner = newOwner;
     }
 }

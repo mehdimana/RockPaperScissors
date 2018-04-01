@@ -1,8 +1,23 @@
-pragma solidity ^0.4.19;
-import "./Mortal.sol";
-import "./Stoppable.sol";
+pragma solidity ^0.4.21;
+import "./GenericHubSubContract.sol";
 
-contract RockPaperScissors is Mortal, Stoppable {
+contract RockPaperScissorsParameters is GenericHubSubContractParameters {
+    address player1Address;
+    address player2Address; 
+    uint stake;
+    
+    function RockPaperScissorsParameters(address _player1Address, address _player2Address, uint _stake) public {
+        player1Address = _player1Address;
+        player2Address = _player2Address;
+        stake = _stake;
+    }
+    
+    function getStake() view external returns(uint) { return stake; }
+    function getPlayer1Address() view external returns(address) { return player1Address; }
+    function getPlayer2Address() view external returns(address) { return player2Address; }
+}
+
+contract RockPaperScissors is GenericHubSubContract {
     enum GameMoves {Rock, Paper, Scissors}
     
     struct PlayerType {
@@ -40,32 +55,30 @@ contract RockPaperScissors is Mortal, Stoppable {
     
     /**
      * constructor: create a new game
-     * @param player1Address first player
-     * @param player2Address second player
-     * @param stake can be 0.
+     * @param paramers needed parameters for creating this contract
      */
-    function RockPaperScissors(address player1Address, address player2Address, uint _stake) 
+    function RockPaperScissors(RockPaperScissorsParameters paramers) 
             public 
             onlyIfrunning 
             accessibleByOwnerOnly{
-        require(player1Address != address(0));
-        require(player2Address != address(0)); // we expect two real players.
-        require(player1Address != player2Address); // we expect # players
+        require(paramers.getPlayer1Address() != address(0));
+        require(paramers.getPlayer2Address() != address(0)); // we expect two real players.
+        require(paramers.getPlayer1Address() != paramers.getPlayer2Address()); // we expect # players
         require(gameFinished == true); // check that this game is not finished.
   
-        stake = _stake;
+        stake = paramers.getStake();
         //gameFinished = false; //save gas
-        player1.playerAddress = player1Address;
+        player1.playerAddress = paramers.getPlayer1Address();
         //players1.hasDeposited = false; //save gas
         //players1.hasReclaimed = false;  //save gas
         //players1.hasRevealed = false;  //save gas
         
-        player2.playerAddress = player2Address;
+        player2.playerAddress = paramers.getPlayer2Address();
         //players2.hasDeposited = false; //save gas
        // players2.hasReclaimed = false; //save gas
         //players2.hasRevealed = false;  //save gas
         
-        LogGameCreated(stake, player1Address, player2Address, this);
+        emit LogGameCreated(stake, paramers.getPlayer1Address(), paramers.getPlayer2Address(), this);
     }
     
     function getCallingPlayer(address playerAddress) internal returns(PlayerType actualPlayer) {
@@ -106,7 +119,7 @@ contract RockPaperScissors is Mortal, Stoppable {
         
         actualPlayer.moveHased = hashMove; //then he plays.
         actualPlayer.hasDeposited = true;
-        LogPlay(hashMove, msg.sender, this);
+        emit LogPlay(hashMove, msg.sender, this);
         return true;
     }
     
@@ -133,17 +146,17 @@ contract RockPaperScissors is Mortal, Stoppable {
         
         actualPlayer.move = move; //then his play is revealed.
         actualPlayer.hasRevealed = true;
-        LogRevealed(move, msg.sender, this);
+        emit LogRevealed(move, msg.sender, this);
         
         //check if we have a winner
         if (otherPlayer.hasRevealed) {
             int compareResult = compare(player1.move, player2.move);
             if (compareResult == -1) { //player1 winner
-                LogWinnerRevealed(player1.playerAddress, player2.playerAddress, this);
+                emit LogWinnerRevealed(player1.playerAddress, player2.playerAddress, this);
             } else if (compareResult == 1) { //player2 is a winner
-                LogWinnerRevealed(player2.playerAddress, player1.playerAddress, this);
+                emit LogWinnerRevealed(player2.playerAddress, player1.playerAddress, this);
             } else { //a draw
-                LogDrawRevealed(player1.playerAddress, player2.playerAddress, this);
+                emit LogDrawRevealed(player1.playerAddress, player2.playerAddress, this);
             }
         }
         
@@ -169,7 +182,7 @@ contract RockPaperScissors is Mortal, Stoppable {
   
         uint ammount = stake * 2; // this is >0 since previous require
         gameFinished = true;//avoid re-entrency and make sure the stake is send only once
-        LogClaim(ammount, msg.sender, this); 
+        emit LogClaim(ammount, msg.sender, this); 
         msg.sender.transfer(ammount);
         return true;
     }
@@ -198,7 +211,7 @@ contract RockPaperScissors is Mortal, Stoppable {
             gameFinished = true; // finish the game when bothe playerss have reclaimed.
         }
         
-        LogClaim(ammount, msg.sender, this); 
+        emit LogClaim(ammount, msg.sender, this); 
         msg.sender.transfer(ammount);
         
         return true;

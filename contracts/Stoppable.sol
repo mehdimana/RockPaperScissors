@@ -1,4 +1,4 @@
-pragma solidity ^0.4.19;
+pragma solidity ^0.4.21;
 
 import "./Owned.sol";
 
@@ -17,7 +17,7 @@ contract Stoppable is Owned {
     }
     
     function runStopSwitch(bool onOff) accessibleByOwnerOnly public {
-        LogRunningStateChange(onOff);
+        emit LogRunningStateChange(onOff);
         running = onOff;
     }
     
