@@ -1,21 +1,5 @@
 pragma solidity ^0.4.21;
-import "./GenericHubSubContract.sol";
-
-contract RockPaperScissorsParameters is GenericHubSubContractParameters {
-    address player1Address;
-    address player2Address; 
-    uint stake;
-    
-    function RockPaperScissorsParameters(address _player1Address, address _player2Address, uint _stake) public {
-        player1Address = _player1Address;
-        player2Address = _player2Address;
-        stake = _stake;
-    }
-    
-    function getStake() view external returns(uint) { return stake; }
-    function getPlayer1Address() view external returns(address) { return player1Address; }
-    function getPlayer2Address() view external returns(address) { return player2Address; }
-}
+import "./RockPaperScissorsParameters.sol";
 
 contract RockPaperScissors is GenericHubSubContract {
     enum GameMoves {Rock, Paper, Scissors}
@@ -29,11 +13,11 @@ contract RockPaperScissors is GenericHubSubContract {
         bool hasReclaimed;
     }
     
-    PlayerType player1;
-    PlayerType player2;
+    PlayerType public player1;
+    PlayerType public player2;
     
-    uint stake; //the amount each player should transfer
-    bool gameFinished; //true when the winner has reclaimed his money
+    uint public stake; //the amount each player should transfer
+    bool public gameFinished; //true when the winner has reclaimed his money
 
     event LogWinnerRevealed(address winner, address loser, address contractAddress);
     event LogDrawRevealed(address player1, address player2, address contractAddress);
@@ -42,6 +26,19 @@ contract RockPaperScissors is GenericHubSubContract {
     event LogRevealed(GameMoves move, address player, address contractAddress);
     event LogGameCreated(uint stake, address player1, address player2, address contractAddress);
     
+    // modifiers
+    modifier gameNotFinished 
+    {
+        require(!gameFinished);
+        _;
+    }
+    
+    modifier gameHasStake 
+    {
+        require(stake > 0);
+        _;
+    }
+
     /**
      * create a move hash using 
      * - this so that the same pwd can be reused across instances of this contract, 
@@ -49,39 +46,47 @@ contract RockPaperScissors is GenericHubSubContract {
      * - owner so that a pwd can be reused accross players
      * - the move
      */
-    function calculateMovesHash(address owner, bytes32 pwd, GameMoves move) public view returns(bytes32 hash) {
+    function calculateMovesHash(address owner, bytes32 pwd, GameMoves move) 
+            public 
+            view 
+            returns(bytes32 hash) 
+    {
         return keccak256(this, owner, pwd, move); 
     }
     
     /**
      * constructor: create a new game
-     * @param paramers needed parameters for creating this contract
+     * @param trustedParamers needed parameters for creating this contract
      */
-    function RockPaperScissors(RockPaperScissorsParameters paramers) 
+    function RockPaperScissors(RockPaperScissorsParameters trustedParamers) 
             public 
             onlyIfrunning 
-            accessibleByOwnerOnly{
-        require(paramers.getPlayer1Address() != address(0));
-        require(paramers.getPlayer2Address() != address(0)); // we expect two real players.
-        require(paramers.getPlayer1Address() != paramers.getPlayer2Address()); // we expect # players
-        require(gameFinished == true); // check that this game is not finished.
+            accessibleByOwnerOnly
+    {
+        require(trustedParamers.getPlayer1Address() != address(0));
+        require(trustedParamers.getPlayer2Address() != address(0)); // we expect two real players.
+        require(trustedParamers.getPlayer1Address() != trustedParamers.getPlayer2Address()); // we expect # players
   
-        stake = paramers.getStake();
+        stake = trustedParamers.getStake();
         //gameFinished = false; //save gas
-        player1.playerAddress = paramers.getPlayer1Address();
+        player1.playerAddress = trustedParamers.getPlayer1Address();
         //players1.hasDeposited = false; //save gas
         //players1.hasReclaimed = false;  //save gas
         //players1.hasRevealed = false;  //save gas
         
-        player2.playerAddress = paramers.getPlayer2Address();
+        player2.playerAddress = trustedParamers.getPlayer2Address();
         //players2.hasDeposited = false; //save gas
        // players2.hasReclaimed = false; //save gas
         //players2.hasRevealed = false;  //save gas
         
-        emit LogGameCreated(stake, paramers.getPlayer1Address(), paramers.getPlayer2Address(), this);
+        emit LogGameCreated(stake, trustedParamers.getPlayer1Address(), trustedParamers.getPlayer2Address(), this);
     }
     
-    function getCallingPlayer(address playerAddress) internal returns(PlayerType actualPlayer) {
+    function getCallingPlayer() 
+            internal 
+            view 
+            returns(PlayerType storage actualPlayer) 
+    {
         if (player1.playerAddress == msg.sender) {
             return player1;
         } else if (player2.playerAddress == msg.sender) {
@@ -91,7 +96,11 @@ contract RockPaperScissors is GenericHubSubContract {
         }
     }
     
-    function getOtherPlayer(address playerAddress) internal returns(PlayerType actualPlayer) {
+    function getOtherPlayer() 
+            internal 
+            view 
+            returns(PlayerType storage actualPlayer) 
+    {
         if (player1.playerAddress == msg.sender) {
             return player2;
         } else if (player2.playerAddress == msg.sender) {
@@ -103,18 +112,18 @@ contract RockPaperScissors is GenericHubSubContract {
     
     /**
      * when a game has been created, each player involved can play once (if stake > 0) the player should send the proper amount while playing
-     * @param gameHash the game id
      * @param hashMove this player's move (hashed)
      * @return true if successful
      */
-    function play(bytes32 gameHash, bytes32 hashMove) 
+    function play(bytes32 hashMove) 
             external 
             payable 
-            returns(bool success) {
-        require(!gameFinished); // game should not be finished.
+            gameNotFinished
+            returns(bool success) 
+    {
         require(stake == msg.value); // player should transfer the proper ammount
         
-        PlayerType memory actualPlayer = getCallingPlayer(msg.sender); //get the current player
+        PlayerType storage actualPlayer = getCallingPlayer(); //get the current player
         require(!actualPlayer.hasDeposited);// player has not yet hasDeposited
         
         actualPlayer.moveHased = hashMove; //then he plays.
@@ -125,19 +134,19 @@ contract RockPaperScissors is GenericHubSubContract {
     
     /**
      * when each player has played, each played shall reveal his move.
-     * @param gameHash the game id
      * @param pwd the password used to hash the move
      * @param move the move that was hashed.
      * @return true if successful
      */
-    function reveal(bytes32 gameHash, bytes32 pwd, GameMoves move) 
+    function reveal(bytes32 pwd, GameMoves move) 
             external 
-            returns(bool success) {
-        require(!gameFinished); // game should not be finished.
-        PlayerType memory actualPlayer = getCallingPlayer(msg.sender); //get the current player
+            gameNotFinished
+            returns(bool success) 
+    {
+        PlayerType memory actualPlayer = getCallingPlayer(); //get the current player
         require(actualPlayer.hasDeposited);// player has hasDeposited
         
-        PlayerType memory otherPlayer = getOtherPlayer(msg.sender);
+        PlayerType memory otherPlayer = getOtherPlayer();
         require(otherPlayer.hasDeposited);// the other player has hasDeposited
         require(!actualPlayer.hasRevealed);// player has not yet revealed
         
@@ -165,15 +174,19 @@ contract RockPaperScissors is GenericHubSubContract {
 
     /**
      * if there is a winner after both players have played, the winner can claim 
-     * @param gameHash the game's id
      * @return true if successful
      */
-    function claimAsWinner(bytes32 gameHash)
+    function claimAsWinner()
             external 
-            returns(bool success) {
+            gameNotFinished // game should not be finished
+            gameHasStake // don't claim if no stake
+            returns(bool success) 
+    {
         require(player1.hasRevealed 
              && player2.hasRevealed); //both players should have played already
-        require(stake > 0); // don't claim if no stake
+             
+        PlayerType memory actualPlayer = getCallingPlayer(); //get the current player
+        require(!actualPlayer.hasReclaimed); // this player has not reclaimed already
         
         int compareResult = compare(player1.move, player2.move);   
         //sender should be the winner (if not do not call us)
@@ -189,22 +202,22 @@ contract RockPaperScissors is GenericHubSubContract {
     
     /** 
      * if it is a draw each player involved can recover their stake
-     * @param gameHash the game's id
      * @return true if successful
      */
-    function claimDraw(bytes32 gameHash) 
+    function claimDraw() 
             external 
-            returns(bool success) {
-        
-        
-        PlayerType memory actualPlayer = getCallingPlayer(msg.sender); //get the current player
+            gameNotFinished // game should not be finished
+            gameHasStake // don't claim if no stake
+            returns(bool success) 
+    {
+        PlayerType memory actualPlayer = getCallingPlayer(); //get the current player
         require(!actualPlayer.hasReclaimed); // this player has not reclaimed already
-        PlayerType memory otherPlayer = getOtherPlayer(msg.sender);
+        PlayerType memory otherPlayer = getOtherPlayer();
         require(actualPlayer.hasRevealed 
              && otherPlayer.hasRevealed); //both players should have played already
              
         require( 0 == compare(actualPlayer.move, otherPlayer.move)); //it's a draw
-        require(stake > 0); // don't claim if no stake
+
         uint ammount = stake;
         actualPlayer.hasReclaimed = true; //avoir re-entrency
         if (otherPlayer.hasReclaimed) {
@@ -227,7 +240,8 @@ contract RockPaperScissors is GenericHubSubContract {
     function compare(GameMoves player1Move, GameMoves player2Move) 
             pure 
             private 
-            returns(int winner){
+            returns(int winner)
+    {
         //split in multiple ifs to reduce mental load.
         if (player1Move == player2Move)
             return 0;
@@ -242,7 +256,5 @@ contract RockPaperScissors is GenericHubSubContract {
             return -1; //player1Move wins
             
         return 1; //player2Move wins
-            
-        
     }
 }

@@ -1,5 +1,5 @@
-var RockPaperScissors = artifacts.require("./RockPaperScissors.sol");
+var RockPaperScissorsHub = artifacts.require("./RockPaperScissorsHub.sol");
 
 module.exports = function(deployer) {
-  deployer.deploy(RockPaperScissors);
+  deployer.deploy(RockPaperScissorsHub, "hubName");
 };

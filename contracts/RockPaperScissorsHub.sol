@@ -14,8 +14,14 @@ contract RockPaperScissorsHub is GenericHub {
             GenericHub(_hubName)
     {}
     
+    /**
+     * overides GenericHub actual creation of the contract.
+     * @return RockPaperScissors contract instance
+     */
     function doCreateSubContract(GenericHubSubContractParameters params)
             public
+            accessibleByOwnerOnly
+            onlyIfrunning
             returns(GenericHubSubContract createdContract) 
     {
         return new RockPaperScissors(RockPaperScissorsParameters(params));      

@@ -3,25 +3,48 @@ pragma solidity ^0.4.21;
 contract Owned {
     address private owner;
     
-    event LogOwnerChange(address owner, address newOwner);
+    event LogOwnerChange(address sender, address owner, address newOwner);
     
-    function Owned() public {
+    /**
+     * contruct this contract and remeber owner 
+     */
+    function Owned() 
+            public 
+    {
         owner = msg.sender;
         assert(owner != address(0));
     }
     
-    modifier accessibleByOwnerOnly {
+    modifier accessibleByOwnerOnly 
+    {
         require(owner == msg.sender);
         _;
     }
     
-    function getOwner() public view returns(address ownerAddress) {
+    /**
+     * @return owner of the contract
+     */
+    function getOwner() 
+            public 
+            view 
+            returns(address ownerAddress) 
+    {
         return owner;
     }
     
-    function setOwner(address newOwner) public accessibleByOwnerOnly {
+    /**
+     * change the owner of the contract
+     * only available to actual owne
+     * @return true if call successful
+     */
+    function setOwner(address newOwner) 
+            public 
+            accessibleByOwnerOnly 
+            returns(bool success)
+    {
         assert(newOwner != address(0));
-        emit LogOwnerChange(owner, newOwner);
+        emit LogOwnerChange(msg.sender, owner, newOwner);
         owner = newOwner;
+        return true;
     }
 }
