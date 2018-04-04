@@ -143,10 +143,10 @@ contract RockPaperScissors is GenericHubSubContract {
             gameNotFinished
             returns(bool success) 
     {
-        PlayerType memory actualPlayer = getCallingPlayer(); //get the current player
+        PlayerType storage actualPlayer = getCallingPlayer(); //get the current player
         require(actualPlayer.hasDeposited);// player has hasDeposited
         
-        PlayerType memory otherPlayer = getOtherPlayer();
+        PlayerType storage otherPlayer = getOtherPlayer();
         require(otherPlayer.hasDeposited);// the other player has hasDeposited
         require(!actualPlayer.hasRevealed);// player has not yet revealed
         
@@ -184,10 +184,10 @@ contract RockPaperScissors is GenericHubSubContract {
     {
         require(player1.hasRevealed 
              && player2.hasRevealed); //both players should have played already
-             
-        PlayerType memory actualPlayer = getCallingPlayer(); //get the current player
+            
+        PlayerType storage actualPlayer = getCallingPlayer(); //get the current player
         require(!actualPlayer.hasReclaimed); // this player has not reclaimed already
-        
+         
         int compareResult = compare(player1.move, player2.move);   
         //sender should be the winner (if not do not call us)
         require((compareResult == -1 && player1.playerAddress == msg.sender) //sender is player1 and has Won
@@ -210,9 +210,9 @@ contract RockPaperScissors is GenericHubSubContract {
             gameHasStake // don't claim if no stake
             returns(bool success) 
     {
-        PlayerType memory actualPlayer = getCallingPlayer(); //get the current player
+        PlayerType storage actualPlayer = getCallingPlayer(); //get the current player
         require(!actualPlayer.hasReclaimed); // this player has not reclaimed already
-        PlayerType memory otherPlayer = getOtherPlayer();
+        PlayerType storage otherPlayer = getOtherPlayer();
         require(actualPlayer.hasRevealed 
              && otherPlayer.hasRevealed); //both players should have played already
              
