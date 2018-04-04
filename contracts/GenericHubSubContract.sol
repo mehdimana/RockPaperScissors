@@ -5,4 +5,4 @@ import "./Stoppable.sol";
 contract GenericHubSubContract is Mortal, Stoppable {
 }
 
-contract GenericHubSubContractParameters {} 
+interface GenericHubSubContractParameters {} 

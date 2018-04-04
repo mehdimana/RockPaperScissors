@@ -9,9 +9,9 @@ contract RockPaperScissorsHub is GenericHub {
      * contructor
      * @param _hubName name of thiss hub (used during event emitting)
      */
-    function RockPaperScissorsHub(bytes32 _hubName)
+    function RockPaperScissorsHub(bytes32 _hubName, uint subContractCreationCost)
             public 
-            GenericHub(_hubName)
+            GenericHub(_hubName, subContractCreationCost)
     {}
     
     /**
@@ -20,7 +20,6 @@ contract RockPaperScissorsHub is GenericHub {
      */
     function doCreateSubContract(GenericHubSubContractParameters params)
             public
-            accessibleByOwnerOnly
             onlyIfrunning
             returns(GenericHubSubContract createdContract) 
     {

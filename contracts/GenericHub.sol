@@ -7,6 +7,7 @@ contract GenericHub is Mortal, Stoppable {
     GenericHubSubContract[] public genericHubSubContractsArray;
     mapping(address => bool) public genericSubContractExsists;
     bytes32 public hubName;
+    uint subContractCreationCost;
     
     modifier onlyIfknownSubContract(address subContractAddress) 
     {
@@ -24,10 +25,11 @@ contract GenericHub is Mortal, Stoppable {
      * contructor
      * @param _hubName name of thiss hub (used during event emitting)
      */
-    function GenericHub(bytes32 _hubName)
+    function GenericHub(bytes32 _hubName, uint _subContractCreationCost)
             public 
     {
         hubName = _hubName;
+        subContractCreationCost = _subContractCreationCost;
     }
 
     /**
@@ -44,21 +46,30 @@ contract GenericHub is Mortal, Stoppable {
     /**
      * creates a new subcontracrt that will be managed by this hub. 
      * the created contract should derive from GenericHubSubContract 
-     * TODO make it callable by other people and payable (costs something to create a subcontract --> configurable)
-     * TODO add a function to retrieve eth by owner
      */
     function createNewSubContract(GenericHubSubContractParameters params) 
-            accessibleByOwnerOnly
             onlyIfrunning
             external
+            payable
             returns(address newContractAddresss)
     {
+        require(subContractCreationCost == msg.value); //cost of creating a contract
         GenericHubSubContract trustedGenericHubSubContract = doCreateSubContract(params);
         genericHubSubContractsArray.push(trustedGenericHubSubContract);
         genericSubContractExsists[trustedGenericHubSubContract] = true;
         emit LogNewSubContractCreated(msg.sender, hubName, trustedGenericHubSubContract);
         return trustedGenericHubSubContract;
     }
+    
+    function withDraw()
+            accessibleByOwnerOnly
+            external
+            returns(bool success) 
+    {
+        msg.sender.transfer(address(this).balance);
+        return true;
+    }
+        
     
     /**
      * interface function to be implemented by children of this hub contract
@@ -117,7 +128,7 @@ contract GenericHub is Mortal, Stoppable {
             returns(bool success)
     {
         for (uint i=0; i<genericHubSubContractsArray.length; i++) {
-            genericHubSubContractsArray[i].runStopSwitch(onOff);
+            genericHubSubContractsArray[i].runStopSwitch(onOff); //trusted contract
             emit LogSubContractRunningStateChange(msg.sender, genericHubSubContractsArray[i], onOff);
         }
         return true;

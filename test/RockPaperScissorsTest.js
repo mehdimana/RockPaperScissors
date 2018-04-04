@@ -19,7 +19,7 @@ contract('RockPaperScissors', function(accounts) {
 		return RockPaperScissorsParameters.new(player1, player2, 100, {from: owner})
 			.then(instance => {
 				hubParametersInstance = instance;
-				return RockPaperScissorsHub.new("myHub", {from: owner})
+				return RockPaperScissorsHub.new("myHub", 1000, {from: owner})
 			}).then(function(instance){
 				hubContractInstance = instance;
 			})
@@ -33,11 +33,23 @@ contract('RockPaperScissors', function(accounts) {
 			return RockPaperScissorsParameters.new(player1, player2, 100, {from: owner})
 			.then(instance => {
 				hubParametersInstance = instance;
-				return hubContractInstance.createNewSubContract(hubParametersInstance.address, {from: owner});
+				return hubContractInstance.createNewSubContract(hubParametersInstance.address, {from: other, value: 1000});
 			}).then(txObject => {
 				assert.strictEqual(1, parseInt(txObject.receipt.status), "transaction was expected to be successfull.");
 				assert.strictEqual(1, txObject.logs.length);
 			})
+			
+		});
+
+		it("should create un-succesfully if not enought funds sent", () => {
+			var hubParametersInstance;
+			return RockPaperScissorsParameters.new(player1, player2, 100, {from: owner})
+			.then(instance => {
+				hubParametersInstance = instance;
+				return expectedExceptionPromise(function () {
+	                    return hubContractInstance.createNewSubContract(hubParametersInstance.address, {from: owner, value: 999});
+	                }, 3000000);	
+			});
 			
 		});
 
@@ -46,7 +58,7 @@ contract('RockPaperScissors', function(accounts) {
 			return RockPaperScissorsParameters.new(player1, player2, 0, {from: owner})
 			.then(instance => {
 				hubParametersInstance = instance;
-				return hubContractInstance.createNewSubContract(hubParametersInstance.address, {from: owner});
+				return hubContractInstance.createNewSubContract(hubParametersInstance.address, {from: other, value: 1000});
 			}).then(txObject => {
 				assert.strictEqual(1, parseInt(txObject.receipt.status), "transaction was expected to be successfull.");
 				assert.strictEqual(1, txObject.logs.length);
@@ -58,7 +70,7 @@ contract('RockPaperScissors', function(accounts) {
 			.then(instance => {		
 				hubParametersInstance = instance;
 				return expectedExceptionPromise(function () {
-	                    return hubContractInstance.createNewSubContract(hubParametersInstance.address, {from: owner});
+	                    return hubContractInstance.createNewSubContract(hubParametersInstance.address, {from: other, value: 1000});
 	                    hubContractInstance.createGame(1, 0, player2, 100, {from: owner, gas:5000000});
 	                }, 3000000);	
 			})
@@ -69,7 +81,7 @@ contract('RockPaperScissors', function(accounts) {
 			.then(instance => {		
 				hubParametersInstance = instance;
 				return expectedExceptionPromise(function () {
-	                    return hubContractInstance.createNewSubContract(hubParametersInstance.address, {from: owner});
+	                    return hubContractInstance.createNewSubContract(hubParametersInstance.address, {from: other, value: 1000});
 	                    hubContractInstance.createGame(1, player1, 0, 100, {from: owner, gas:5000000});
 	                }, 3000000);	
 			})
@@ -80,7 +92,7 @@ contract('RockPaperScissors', function(accounts) {
 			.then(instance => {		
 				hubParametersInstance = instance;
 				return expectedExceptionPromise(function () {
-	                    return hubContractInstance.createNewSubContract(hubParametersInstance.address, {from: owner});
+	                    return hubContractInstance.createNewSubContract(hubParametersInstance.address, {from: owner, value: 1000});
 	                    hubContractInstance.createGame(1, player1, 0, 100, {from: owner, gas:5000000});
 	                }, 3000000);	
 			})
@@ -97,7 +109,7 @@ contract('RockPaperScissors', function(accounts) {
 			return RockPaperScissorsParameters.new(player1, player2, 100, {from: owner})
 			.then(instance => {
 				hubParametersInstance = instance;
-				return hubContractInstance.createNewSubContract(hubParametersInstance.address, {from: owner});
+				return hubContractInstance.createNewSubContract(hubParametersInstance.address, {from: owner, value: 1000});
 			}).then(txObject => {
 				assert.strictEqual(1, parseInt(txObject.receipt.status), "transaction was expected to be successfull.");
 				assert.strictEqual(1, txObject.logs.length);
@@ -161,7 +173,7 @@ contract('RockPaperScissors', function(accounts) {
 			return RockPaperScissorsParameters.new(player1, player2, 100, {from: owner})
 			.then(instance => {
 				hubParametersInstance = instance;
-				return hubContractInstance.createNewSubContract(hubParametersInstance.address, {from: owner});
+				return hubContractInstance.createNewSubContract(hubParametersInstance.address, {from: owner, value: 1000});
 			}).then(txObject => {
 				assert.strictEqual(1, parseInt(txObject.receipt.status), "transaction was expected to be successfull.");
 				assert.strictEqual(1, txObject.logs.length);
@@ -214,7 +226,7 @@ contract('RockPaperScissors', function(accounts) {
 			return RockPaperScissorsParameters.new(player1, player2, 100, {from: owner})
 			.then(instance => {
 				hubParametersInstance = instance;
-				return hubContractInstance.createNewSubContract(hubParametersInstance.address, {from: owner});
+				return hubContractInstance.createNewSubContract(hubParametersInstance.address, {from: owner, value: 1000});
 			}).then(txObject => {
 				assert.strictEqual(1, parseInt(txObject.receipt.status), "transaction was expected to be successfull.");
 				assert.strictEqual(1, txObject.logs.length);
@@ -276,7 +288,7 @@ contract('RockPaperScissors', function(accounts) {
 			return RockPaperScissorsParameters.new(player1, player2, 100, {from: owner})
 			.then(instance => {
 				hubParametersInstance = instance;
-				return hubContractInstance.createNewSubContract(hubParametersInstance.address, {from: owner});
+				return hubContractInstance.createNewSubContract(hubParametersInstance.address, {from: owner, value: 1000});
 			}).then(txObject => {
 				assert.strictEqual(1, parseInt(txObject.receipt.status), "transaction was expected to be successfull.");
 				assert.strictEqual(1, txObject.logs.length);
@@ -333,7 +345,7 @@ contract('RockPaperScissors', function(accounts) {
 			return RockPaperScissorsParameters.new(player1, player2, 100, {from: owner})
 			.then(instance => {
 				hubParametersInstance = instance;
-				return hubContractInstance.createNewSubContract(hubParametersInstance.address, {from: owner});
+				return hubContractInstance.createNewSubContract(hubParametersInstance.address, {from: owner, value: 1000});
 			}).then(txObject => {
 				assert.strictEqual(1, parseInt(txObject.receipt.status), "transaction was expected to be successfull.");
 				assert.strictEqual(1, txObject.logs.length);
