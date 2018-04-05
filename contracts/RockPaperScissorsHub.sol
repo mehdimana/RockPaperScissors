@@ -7,11 +7,12 @@ contract RockPaperScissorsHub is GenericHub {
 
     /**
      * contructor
-     * @param _hubName name of thiss hub (used during event emitting)
+     * @param hubName name of thiss hub (used during event emitting)
+     * @param subContractCreationCost cost of creating a subcontract. can be 0.
      */
-    function RockPaperScissorsHub(bytes32 _hubName, uint subContractCreationCost)
+    function RockPaperScissorsHub(bytes32 hubName, uint subContractCreationCost)
             public 
-            GenericHub(_hubName, subContractCreationCost)
+            GenericHub(hubName, subContractCreationCost)
     {}
     
     /**

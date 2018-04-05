@@ -1,7 +1,7 @@
 body {
-  margin-left: 25%;
-  margin-right: 25%;
-  margin-top: 10%;
+  margin-left: 10%;
+  margin-right: 10%;
+  margin-top: 1%;
   font-family: "Open Sans", sans-serif;
 }
 
@@ -12,7 +12,7 @@ label {
 
 input {
   width: 500px;
-  padding: 5px;
+  padding: 0px;
   font-size: 16px;
 }
 
@@ -49,4 +49,19 @@ h3 {
 
 .hint {
   color: #666;
+}
+
+.section {
+  border-width: 0.5px;  
+  border-style: solid;
+  padding: 5px;
+  margin: 10px;
+}
+
+.container {
+  display: flex;
+}
+
+.container > div {
+  flex: 1; /*grow*/
 }
