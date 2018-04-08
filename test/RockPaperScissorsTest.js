@@ -17,12 +17,12 @@ contract('RockPaperScissors', function(accounts) {
 
 	beforeEach(function() {
 		return RockPaperScissorsParameters.new(player1, player2, 100, {from: owner})
-			.then(instance => {
-				hubParametersInstance = instance;
-				return RockPaperScissorsHub.new("myHub", 1000, {from: owner})
-			}).then(function(instance){
-				hubContractInstance = instance;
-			})
+		.then(instance => {
+			hubParametersInstance = instance;
+			return RockPaperScissorsHub.new("myHub", 1000, {from: owner})
+		}).then(function(instance){
+			hubContractInstance = instance;
+		})
 	})
 
 	describe("test create game", () => {
@@ -68,33 +68,27 @@ contract('RockPaperScissors', function(accounts) {
 		it("should not succeed if player 1 is 0", () => {	
 			return RockPaperScissorsParameters.new(0, player2, 0, {from: owner})
 			.then(instance => {		
-				hubParametersInstance = instance;
-				return expectedExceptionPromise(function () {
-	                    return hubContractInstance.createNewSubContract(hubParametersInstance.address, {from: other, value: 1000});
-	                    hubContractInstance.createGame(1, 0, player2, 100, {from: owner, gas:5000000});
-	                }, 3000000);	
+				assert.true(false);	
+			}).catch(error => {
+				//as expected
 			})
 		});
 
 		it("should not succeed if player 2 is 0", () => {	
-			return RockPaperScissorsParameters.new(0, player1, 0, {from: owner})
+			return RockPaperScissorsParameters.new(player1, 0, 0, {from: owner})
 			.then(instance => {		
-				hubParametersInstance = instance;
-				return expectedExceptionPromise(function () {
-	                    return hubContractInstance.createNewSubContract(hubParametersInstance.address, {from: other, value: 1000});
-	                    hubContractInstance.createGame(1, player1, 0, 100, {from: owner, gas:5000000});
-	                }, 3000000);	
+				assert.true(false);	
+			}).catch(error => {
+				//as expected
 			})
 		});
 
 		it("should not succeed if player 1 is player 2", () => {	
-			return RockPaperScissorsParameters.new(0, player2, player2, {from: owner})
+			return RockPaperScissorsParameters.new(player1, player1, 0, {from: owner})
 			.then(instance => {		
-				hubParametersInstance = instance;
-				return expectedExceptionPromise(function () {
-	                    return hubContractInstance.createNewSubContract(hubParametersInstance.address, {from: owner, value: 1000});
-	                    hubContractInstance.createGame(1, player1, 0, 100, {from: owner, gas:5000000});
-	                }, 3000000);	
+				assert.true(false);	
+			}).catch(error => {
+				//as expected
 			})
 		});		
 	});
