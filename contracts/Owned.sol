@@ -1,7 +1,7 @@
 pragma solidity ^0.4.21;
 
 contract Owned {
-    address private owner;
+    address internal owner;
     
     event LogOwnerChange(address sender, address owner, address newOwner);
     
@@ -11,8 +11,8 @@ contract Owned {
     function Owned() 
             public 
     {
+        require(msg.sender != address(0));
         owner = msg.sender;
-        assert(owner != address(0));
     }
     
     modifier accessibleByOwnerOnly 

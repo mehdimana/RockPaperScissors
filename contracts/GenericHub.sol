@@ -19,7 +19,7 @@ contract GenericHub is Mortal, Stoppable {
     
     event LogSubContractKilled(address sender, address contractAddress);
     event LogSubContractRunningStateChange(address sender, address contractAddress, bool running);
-    event LogOwnerChange(address sender, address owner, address newOwner);
+    event LogOwnerChange(address owner, address newOwner);
     
     /**
      * contructor
@@ -94,7 +94,7 @@ contract GenericHub is Mortal, Stoppable {
             returns(bool success)
     {
         require(newOwner != address(0));
-        emit LogOwnerChange(msg.sender, getOwner(), newOwner);
+        emit LogOwnerChange(owner, newOwner);
         return setOwner(newOwner);
     }
     
@@ -114,26 +114,7 @@ contract GenericHub is Mortal, Stoppable {
         emit LogSubContractRunningStateChange(msg.sender, stoppable, onOff);
         return stoppable.runStopSwitch(onOff);
     }
-    
-    /**
-     * disables/enables all sub contracts  --> emergency call, to be used with care since the number of subContract is unknow
-     * could fail (cost too much gas)
-     * safe: only accesssible by owner.
-     * @param onOff true or false (true --> enable, false --> disable)
-     * return true if successful
-     */ 
-    function runStopSwitchForAllSubContracts(bool onOff) 
-            accessibleByOwnerOnly
-            external 
-            returns(bool success)
-    {
-        for (uint i=0; i<genericHubSubContractsArray.length; i++) {
-            genericHubSubContractsArray[i].runStopSwitch(onOff); //trusted contract
-            emit LogSubContractRunningStateChange(msg.sender, genericHubSubContractsArray[i], onOff);
-        }
-        return true;
-    }
-    
+
     /**
      * kills a sub contract
      * @param subContractAddress the subContract to kill
@@ -149,41 +130,5 @@ contract GenericHub is Mortal, Stoppable {
         emit LogSubContractKilled(msg.sender, subContractAddress);
         return mortal.kill();
     }
-    
-    /**
-     * kills all sub contracts --> emergency call, to be used with care since the number of subContract is unknow
-     * could fail (cost too much gas)
-     * safe: only accesssible by owner.
-     * @return true if successful
-     */
-    function killAllSubContracts() 
-            accessibleByOwnerOnly
-            external
-            returns(bool success)
-    {
-        for (uint i=0; i<genericHubSubContractsArray.length; i++) {
-            emit LogSubContractKilled(msg.sender, genericHubSubContractsArray[i]);
-            genericHubSubContractsArray[i].kill();
-        }
-        return true;
-    }
-    
-    
-    /**
-     * kills nbSubContractsToKill sub contracts starting from the begining of the contract array --> emergency call, to be used with care.
-     * could fail (cost too much gas --> adjust nbSubContractsToKill accordingly)
-     * safe: only accesssible by owner.
-     * @return true if successful
-     */
-    function killSubContracts(uint nbSubContractsToKill) 
-            accessibleByOwnerOnly
-            external
-            returns(bool success)
-    {
-        for (uint i=0; i<genericHubSubContractsArray.length || i<nbSubContractsToKill; i++) {
-            emit LogSubContractKilled(msg.sender, genericHubSubContractsArray[i]);
-            genericHubSubContractsArray[i].kill();
-        }
-        return true;
-    }    
+   
 }

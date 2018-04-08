@@ -4,7 +4,7 @@ import "./Owned.sol";
 
 contract Stoppable is Owned {
    
-    bool public running;
+    bool internal running;
     event LogRunningStateChange(address sender, bool running);
     
     /**
@@ -20,6 +20,15 @@ contract Stoppable is Owned {
         require(running);
         _;
     }
+
+    function getRunning() 
+            external 
+            view
+            returns(bool success)
+    {
+        return running;
+    }
+
     
     /**
      * switch this contract from a running state to a suspended state
@@ -31,8 +40,10 @@ contract Stoppable is Owned {
             external 
             returns(bool success)
     {
-        emit LogRunningStateChange(msg.sender, onOff);
-        running = onOff;
+        if (onOff != running) {
+            emit LogRunningStateChange(msg.sender, onOff);
+            running = onOff;
+        }
         return true;
     }
     

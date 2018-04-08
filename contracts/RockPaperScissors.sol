@@ -24,7 +24,7 @@ contract RockPaperScissors is GenericHubSubContract {
     event LogClaim(uint ammount, address winner, address contractAddress);
     event LogPlay(bytes32 move, address player, address contractAddress);
     event LogRevealed(GameMoves move, address player, address contractAddress);
-    event LogGameCreated(uint stake, address player1, address player2, address contractAddress);
+    event LogGameCreated(uint stake, address player1, address player2);
     
     // modifiers
     modifier gameNotFinished 
@@ -62,11 +62,7 @@ contract RockPaperScissors is GenericHubSubContract {
             public 
             onlyIfrunning 
             accessibleByOwnerOnly
-    {
-        require(trustedParamers.getPlayer1Address() != address(0));
-        require(trustedParamers.getPlayer2Address() != address(0)); // we expect two real players.
-        require(trustedParamers.getPlayer1Address() != trustedParamers.getPlayer2Address()); // we expect # players
-  
+    { 
         stake = trustedParamers.getStake();
         //gameFinished = false; //save gas
         player1.playerAddress = trustedParamers.getPlayer1Address();
@@ -79,7 +75,7 @@ contract RockPaperScissors is GenericHubSubContract {
        // players2.hasReclaimed = false; //save gas
         //players2.hasRevealed = false;  //save gas
         
-        emit LogGameCreated(stake, trustedParamers.getPlayer1Address(), trustedParamers.getPlayer2Address(), this);
+        emit LogGameCreated(stake, player1.playerAddress, player2.playerAddress);
     }
     
     function getCallingPlayer() 

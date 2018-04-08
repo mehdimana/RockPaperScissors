@@ -7,6 +7,9 @@ contract RockPaperScissorsParameters is GenericHubSubContractParameters {
     uint private stake;
     
     function RockPaperScissorsParameters(address _player1Address, address _player2Address, uint _stake) public {
+        require(_player1Address != address(0));
+        require(_player2Address != address(0)); // we expect two real players.
+        require(_player1Address != _player2Address); // we expect # players
         player1Address = _player1Address;
         player2Address = _player2Address;
         stake = _stake;
