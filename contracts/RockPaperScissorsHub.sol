@@ -26,18 +26,4 @@ contract RockPaperScissorsHub is GenericHub {
     {
         return new RockPaperScissors(RockPaperScissorsParameters(params));   
     }
-
-    /**
-     * overides GenericHub actual creation of the contract.
-     * @return RockPaperScissors contract instance
-     */
-    function doCreateSubContract1(RockPaperScissorsParameters params)
-            public
-            onlyIfrunning
-            //returns(RockPaperScissors createdContract) 
-    {
-        //RockPaperScissorsParameters r = RockPaperScissorsParameters(params);
-        RockPaperScissors rr = new RockPaperScissors(params);
-       // return new RockPaperScissors(RockPaperScissorsParameters(params)); 
-    }
 }

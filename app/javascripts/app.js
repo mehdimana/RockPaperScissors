@@ -7,6 +7,7 @@ const $ = require("jquery");
 const rockPaperScissorsHub = require("../../build/contracts/RockPaperScissorsHub.json");
 const rockPaperScissors = require("../../build/contracts/RockPaperScissors.json");
 const rockPaperScissorsParameters = require("../../build/contracts/RockPaperScissorsParameters.json");
+const genericHubSubContractParameters = require("../../build/contracts/GenericHubSubContractParameters.json");
 
 // Supports Mist, and other wallets that provide 'web3'.
 if (typeof web3 !== 'undefined') {
@@ -26,9 +27,18 @@ RockPaperScissorsHub.setProvider(web3.currentProvider);
 const RockPaperScissorsParameters = truffleContract(rockPaperScissorsParameters);
 RockPaperScissorsParameters.setProvider(web3.currentProvider);
 
-var RockPaperScissors = null;
+const RockPaperScissors = truffleContract(rockPaperScissors);
+RockPaperScissors.setProvider(web3.currentProvider);
+
 
 var latestGameAddress;
+
+var totalGas;
+
+const updateTotalGas = function(gas) {
+  totalGas += gas;
+  updateStatus("Gas used: " + totalGas);
+}
 
 window.addEventListener('load', function() {
     return web3.eth.getAccountsPromise()
@@ -94,11 +104,11 @@ const watchHubEvents = function() {
 
 }
 
-const watchgameEvents = function() {
+const watchgameEvents = function(rpsAddress) {
   var deployed;
-  return RockPaperScissorsHub.deployed().then( deploy => {
-          deployed = deploy;
-            return  deploy.LogClaim({from: account});
+  return RockPaperScissors.at(rpsAddress).then(instance => {
+          deployed = instance;
+            return  deployed.LogClaim({from: account});
          }).then( event => {
             watchEvent(event);
             return deployed.LogPlay({from: account});
@@ -138,48 +148,63 @@ const watchEvent = function(event) {
     if (result.event == "LogNewSubContractCreated") {
       $("#gameAddress").html(result.args.contractAddress);
       latestGameAddress = result.args.contractAddress;
+      watchgameEvents(latestGameAddress);
     }
   })
 }
 
-const createGame = function() {
+const createGame = function() {  
+  var params;
   var deployed;
-  return RockPaperScissorsHub.deployed().then( deploy => {
-    return RockPaperScissorsParameters.new($("#second-player-select").val(),
-                                           $("#second-player-select").val(), 
-                                           $("input[name='stake']").val(), 
-                                           {from: $("#account-select").val(), gas: 5000000})
-    .then(instance => {
-      console.log("parameters address: " + instance.address);
-      return deploy.createNewSubContract.sendTransaction(instance.address, {from: $("#account-select").val(), gas: 5500000, value: 100});
-    }).then(txHash => {
-       return web3.eth.getTransactionReceiptPromise(txHash);
-    }).then(txObject => {
-       console.log(txObject);
-      if (txObject.status == "0x01" || txObject.status == 1) {
-        updateStatus("game created successsfuly.");
-      } else {
-        updateStatus("error creating game.");
-        console.error(txObject);
-      }
-    }).catch(console.error);
-  })
+  return RockPaperScissorsParameters.new($("#first-player-select").val(),
+                                         $("#second-player-select").val(), 
+                                         $("input[name='stake']").val(), 
+                                         {from: $("#account-select").val(), gas: 5000000})
+  .then(instance => {
+    params = instance.address;
+    totalGas = instance.gasUsed;
+    console.log("parameters address: " + params);
+    console.log(instance);
+    return web3.eth.getTransactionReceiptPromise(instance.transactionHash);
+  }).then(txObject =>{
+    totalGas = txObject.gasUsed;
+    return RockPaperScissorsHub.deployed();    
+  }).then( deploy => {
+    deployed = deploy;
+    console.log(deployed);
+    return deployed.createNewSubContract.estimateGas(params, {from: $("#account-select").val(), gas: 5000000, value: 100}); 
+  }).then(estimatedGas => {
+    console.log(estimatedGas);
+    return deployed.createNewSubContract.sendTransaction(params, {from: $("#account-select").val(), gas: estimatedGas, value: 100});
+  }).then(txHash => {
+     return web3.eth.getTransactionReceiptPromise(txHash);
+  }).then(txObject => {
+     updateTotalGas(txObject.gasUsed);
+     console.log(txObject);
+    if (txObject.status == "0x01" || txObject.status == 1) {
+      updateStatus("game created successsfuly.");
+    } else {
+      updateStatus("error creating game.");
+      console.error(txObject);
+    }
+  }).catch(console.error);
+
 }
 
 const playGame = function() {
   //console.log("in play game");
   var deployed;
-   return RockPaperScissors.deployed().then( deploy => {
-            deployed = deploy;
+   return RockPaperScissors.at(latestGameAddress).then(instance => {
+            deployed = instance;
             return getMoveHash();
         }).then(hash => {
-            return  deployed.play.sendTransaction(latestGameAddress, 
-                                                  hash, 
+            return  deployed.play.sendTransaction(hash, 
                                                  {from: $("#account-select").val(),
                                                   value: $("input[name='stake']").val()});
         }).then(txHash => {
           return web3.eth.getTransactionReceiptPromise(txHash);
         }).then(txObject => {
+          updateTotalGas(txObject.gasUsed);
           if (txObject.status == "0x01" || txObject.status == 1) {
             updateStatus("Play successfull.");
           } else {
@@ -191,24 +216,23 @@ const playGame = function() {
 
 const getMoveHash = function() {
   //console.log("in getMoveHash");
-   return RockPaperScissors.deployed() .then( deploy => {
-            return  deploy.calculateMovesHash(latestGameAddress, 
-                                              $("#account-select").val(),
-                                              $("input[name='pwd']").val(),
-                                              $("#move-select").val(),
-                                              {from: $("#account-select").val()});
+   return RockPaperScissors.at(latestGameAddress).then(instance => {
+            return  instance.calculateMovesHash($("#account-select").val(),
+                                                $("input[name='pwd']").val(),
+                                                $("#move-select").val(),
+                                                {from: $("#account-select").val()});
     });
 }
 
 const reveal = function() {
-   return RockPaperScissors.deployed().then( deploy => {
-            return  deploy.reveal.sendTransaction(latestGameAddress,
-                                                  $("input[name='pwd']").val(), 
-                                                  $("#move-select").val(),
-                                                  {from: $("#account-select").val()});
+   return RockPaperScissors.at(latestGameAddress).then(instance => {
+            return  instance.reveal.sendTransaction($("input[name='pwd']").val(), 
+                                                    $("#move-select").val(),
+                                                    {from: $("#account-select").val()});
   }).then(txHash => {
     return web3.eth.getTransactionReceiptPromise(txHash);
   }).then(txObject => {
+     updateTotalGas(txObject.gasUsed);
     if (txObject.status == "0x01" || txObject.status == 1) {
       updateStatus("move revealed successfuly.");
     } else {
@@ -219,12 +243,12 @@ const reveal = function() {
 }
 
 const claimDraw = function() {
-   return RockPaperScissors.deployed().then( deploy => {
-            return  deploy.claimDraw.sendTransaction(latestGameAddress,
-                                                    {from: $("#account-select").val()});
+   return RockPaperScissors.at(latestGameAddress).then(instance => {
+            return  instance.claimDraw.sendTransaction({from: $("#account-select").val()});
   }).then(txHash => {
     return web3.eth.getTransactionReceiptPromise(txHash);
   }).then(txObject => {
+     updateTotalGas(txObject.gasUsed);
     if (txObject.status == "0x01" || txObject.status == 1) {
       updateStatus("claimed successfuly.");
     } else {
@@ -235,12 +259,12 @@ const claimDraw = function() {
 }
 
 const claimAsWinner = function() {
-   return RockPaperScissors.deployed().then( deploy => {
-            return  deploy.claimAsWinner.sendTransaction(latestGameAddress,
-                                                        {from: $("#account-select").val()});
+   return RockPaperScissors.at(latestGameAddress).then(instance => {
+            return  instance.claimAsWinner.sendTransaction({from: $("#account-select").val()});
   }).then(txHash => {
     return web3.eth.getTransactionReceiptPromise(txHash);
   }).then(txObject => {
+    updateTotalGas(txObject.gasUsed);
     if (txObject.status == "0x01" || txObject.status == 1) {
       updateStatus("claimed successsfuly.");
     } else {

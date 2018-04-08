@@ -6,9 +6,8 @@ contract RockPaperScissors is GenericHubSubContract {
     
     struct PlayerType {
         address playerAddress;
-        bytes32 moveHased;
+        bytes32 moveHashed;
         GameMoves move;
-        bool hasDeposited;
         bool hasRevealed;
         bool hasReclaimed;
     }
@@ -66,12 +65,10 @@ contract RockPaperScissors is GenericHubSubContract {
         stake = trustedParamers.getStake();
         //gameFinished = false; //save gas
         player1.playerAddress = trustedParamers.getPlayer1Address();
-        //players1.hasDeposited = false; //save gas
         //players1.hasReclaimed = false;  //save gas
         //players1.hasRevealed = false;  //save gas
         
         player2.playerAddress = trustedParamers.getPlayer2Address();
-        //players2.hasDeposited = false; //save gas
        // players2.hasReclaimed = false; //save gas
         //players2.hasRevealed = false;  //save gas
         
@@ -117,13 +114,13 @@ contract RockPaperScissors is GenericHubSubContract {
             gameNotFinished
             returns(bool success) 
     {
+        require(hashMove != bytes32(0));
         require(stake == msg.value); // player should transfer the proper ammount
         
         PlayerType storage actualPlayer = getCallingPlayer(); //get the current player
-        require(!actualPlayer.hasDeposited);// player has not yet hasDeposited
+        require(actualPlayer.moveHashed == bytes32(0));// player has not yet hasDeposited/played
         
-        actualPlayer.moveHased = hashMove; //then he plays.
-        actualPlayer.hasDeposited = true;
+        actualPlayer.moveHashed = hashMove; //then he plays.
         emit LogPlay(hashMove, msg.sender, this);
         return true;
     }
@@ -140,14 +137,14 @@ contract RockPaperScissors is GenericHubSubContract {
             returns(bool success) 
     {
         PlayerType storage actualPlayer = getCallingPlayer(); //get the current player
-        require(actualPlayer.hasDeposited);// player has hasDeposited
+        require(actualPlayer.moveHashed != bytes32(0));// player has hasDeposited/played
         
         PlayerType storage otherPlayer = getOtherPlayer();
-        require(otherPlayer.hasDeposited);// the other player has hasDeposited
+        require(otherPlayer.moveHashed != bytes32(0));// the other player has hasDeposited/played
         require(!actualPlayer.hasRevealed);// player has not yet revealed
         
         bytes32 hashMove = calculateMovesHash(msg.sender, pwd, move);
-        require(hashMove == actualPlayer.moveHased);// check that the pwd and move match with the previously played move.
+        require(hashMove == actualPlayer.moveHashed);// check that the pwd and move match with the previously played move.
         
         actualPlayer.move = move; //then his play is revealed.
         actualPlayer.hasRevealed = true;

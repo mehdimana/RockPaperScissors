@@ -158,6 +158,19 @@ contract('RockPaperScissors', function(accounts) {
 			})
 		});
 
+		it("should not allow unknown move", () => {	
+			return rpsContractInstance.calculateMovesHash(player1, pwd, 5) //unknown move
+			.then(hash => {
+				moveHashPlayer1 = hash;
+                return rpsContractInstance.play(moveHashPlayer1, {from: player1, value: 99});
+            }).then(txObject => {
+            	assert.true(false); //should never reach this code
+            }).catch(error => {
+            	//expected
+            })
+				
+		});
+
 	});
 
 	describe("tests reveal", () => {
