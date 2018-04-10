@@ -3,7 +3,6 @@ Promise = require("bluebird");
 Promise.promisifyAll(web3.eth, { suffix: "Promise" });
 
 var RockPaperScissorsHub = artifacts.require("./RockPaperScissorsHub.sol");
-var RockPaperScissorsParameters = artifacts.require("./RockPaperScissorsParameters.sol");
 var RockPaperScissors = artifacts.require("./RockPaperScissors.sol");
 
 
@@ -14,27 +13,20 @@ contract('RockPaperScissors', function(accounts) {
 	var player2 = accounts[2];
 	var other = accounts[3];
 	var pwd = "12345678";
-
+	
 	beforeEach(function() {
-		return RockPaperScissorsParameters.new(player1, player2, 100, {from: owner})
-		.then(instance => {
-			hubParametersInstance = instance;
-			return RockPaperScissorsHub.new("myHub", 1000, {from: owner})
-		}).then(function(instance){
+		return RockPaperScissorsHub.new("myHub", 1000, {from: owner})
+		.then(function(instance){
 			hubContractInstance = instance;
 		})
-	})
+	});
 
 	describe("test create game", () => {
 		
 	
 		it("should create succesfully", () => {
-			var hubParametersInstance;
-			return RockPaperScissorsParameters.new(player1, player2, 100, {from: owner})
-			.then(instance => {
-				hubParametersInstance = instance;
-				return hubContractInstance.createNewSubContract(hubParametersInstance.address, {from: other, value: 1000});
-			}).then(txObject => {
+			return hubContractInstance.createNewSubContract(player1, player2, 100, {from: other, value: 1000})
+			.then(txObject => {
 				assert.strictEqual(1, parseInt(txObject.receipt.status), "transaction was expected to be successfull.");
 				assert.strictEqual(1, txObject.logs.length);
 			})
@@ -42,31 +34,22 @@ contract('RockPaperScissors', function(accounts) {
 		});
 
 		it("should create un-succesfully if not enought funds sent", () => {
-			var hubParametersInstance;
-			return RockPaperScissorsParameters.new(player1, player2, 100, {from: owner})
-			.then(instance => {
-				hubParametersInstance = instance;
-				return expectedExceptionPromise(function () {
-	                    return hubContractInstance.createNewSubContract(hubParametersInstance.address, {from: owner, value: 999});
+			return expectedExceptionPromise(function () {
+	                    return hubContractInstance.createNewSubContract(player1, player2, 100, {from: owner, value: 999});
 	                }, 3000000);	
-			});
 			
 		});
 
 		it("should create succesfully if stake is 0", () => {	
-			var hubParametersInstance;
-			return RockPaperScissorsParameters.new(player1, player2, 0, {from: owner})
-			.then(instance => {
-				hubParametersInstance = instance;
-				return hubContractInstance.createNewSubContract(hubParametersInstance.address, {from: other, value: 1000});
-			}).then(txObject => {
+			return hubContractInstance.createNewSubContract(player1, player2, 0, {from: other, value: 1000})
+			.then(txObject => {
 				assert.strictEqual(1, parseInt(txObject.receipt.status), "transaction was expected to be successfull.");
 				assert.strictEqual(1, txObject.logs.length);
 			})			
 		});
 
 		it("should not succeed if player 1 is 0", () => {	
-			return RockPaperScissorsParameters.new(0, player2, 0, {from: owner})
+			return hubContractInstance.createNewSubContract(0, player2, 0, {from: owner})
 			.then(instance => {		
 				assert.true(false);	
 			}).catch(error => {
@@ -75,7 +58,7 @@ contract('RockPaperScissors', function(accounts) {
 		});
 
 		it("should not succeed if player 2 is 0", () => {	
-			return RockPaperScissorsParameters.new(player1, 0, 0, {from: owner})
+			return hubContractInstance.createNewSubContract(player1, 0, 0, {from: owner})
 			.then(instance => {		
 				assert.true(false);	
 			}).catch(error => {
@@ -84,7 +67,7 @@ contract('RockPaperScissors', function(accounts) {
 		});
 
 		it("should not succeed if player 1 is player 2", () => {	
-			return RockPaperScissorsParameters.new(player1, player1, 0, {from: owner})
+			return hubContractInstance.createNewSubContract(player1, player1, 0, {from: owner})
 			.then(instance => {		
 				assert.true(false);	
 			}).catch(error => {
@@ -95,16 +78,12 @@ contract('RockPaperScissors', function(accounts) {
 
 
 	describe("test play", () => {
-		var hubParametersInstance;
 		var rpsContractInstance;
 		var moveHashPlayer1;
 		var moveHashPlayer2;
 		beforeEach(function() {
-			return RockPaperScissorsParameters.new(player1, player2, 100, {from: owner})
-			.then(instance => {
-				hubParametersInstance = instance;
-				return hubContractInstance.createNewSubContract(hubParametersInstance.address, {from: owner, value: 1000});
-			}).then(txObject => {
+			return hubContractInstance.createNewSubContract(player1, player2, 100, {from: owner, value: 1000})
+			.then(txObject => {
 				assert.strictEqual(1, parseInt(txObject.receipt.status), "transaction was expected to be successfull.");
 				assert.strictEqual(1, txObject.logs.length);
 				rpsContractInstance = RockPaperScissors.at(txObject.logs[0].args.contractAddress);
@@ -174,14 +153,12 @@ contract('RockPaperScissors', function(accounts) {
 	});
 
 	describe("tests reveal", () => {
+		var rpsContractInstance;
 		var moveHashPlayer1;
 		var moveHashPlayer2;
 		beforeEach(function() {
-			return RockPaperScissorsParameters.new(player1, player2, 100, {from: owner})
-			.then(instance => {
-				hubParametersInstance = instance;
-				return hubContractInstance.createNewSubContract(hubParametersInstance.address, {from: owner, value: 1000});
-			}).then(txObject => {
+			return hubContractInstance.createNewSubContract(player1, player2, 100, {from: owner, value: 1000})
+			.then(txObject => {
 				assert.strictEqual(1, parseInt(txObject.receipt.status), "transaction was expected to be successfull.");
 				assert.strictEqual(1, txObject.logs.length);
 				rpsContractInstance = RockPaperScissors.at(txObject.logs[0].args.contractAddress);
@@ -226,15 +203,13 @@ contract('RockPaperScissors', function(accounts) {
 
 
 	describe("tests game with a winner", () => {
+		var rpsContractInstance;
 		var gameHash;
 		var moveHashPlayer1;
 		var moveHashPlayer2;
 		beforeEach(function() {
-			return RockPaperScissorsParameters.new(player1, player2, 100, {from: owner})
-			.then(instance => {
-				hubParametersInstance = instance;
-				return hubContractInstance.createNewSubContract(hubParametersInstance.address, {from: owner, value: 1000});
-			}).then(txObject => {
+			return hubContractInstance.createNewSubContract(player1, player2, 100, {from: owner, value: 1000})
+			.then(txObject => {
 				assert.strictEqual(1, parseInt(txObject.receipt.status), "transaction was expected to be successfull.");
 				assert.strictEqual(1, txObject.logs.length);
 				rpsContractInstance = RockPaperScissors.at(txObject.logs[0].args.contractAddress);
@@ -291,12 +266,10 @@ contract('RockPaperScissors', function(accounts) {
 	});
 
 	describe("tests game with a draw", () => {
+		var rpsContractInstance;
 		beforeEach(function() {
-			return RockPaperScissorsParameters.new(player1, player2, 100, {from: owner})
-			.then(instance => {
-				hubParametersInstance = instance;
-				return hubContractInstance.createNewSubContract(hubParametersInstance.address, {from: owner, value: 1000});
-			}).then(txObject => {
+			return hubContractInstance.createNewSubContract(player1, player2, 100, {from: owner, value: 1000})
+			.then(txObject => {
 				assert.strictEqual(1, parseInt(txObject.receipt.status), "transaction was expected to be successfull.");
 				assert.strictEqual(1, txObject.logs.length);
 				rpsContractInstance = RockPaperScissors.at(txObject.logs[0].args.contractAddress);
@@ -349,11 +322,8 @@ contract('RockPaperScissors', function(accounts) {
 	describe("tests game Rock Paper scissors algorithm", () => {
 		var gameHash;
 		var play = function(player1Move, player2Move) {
-			return RockPaperScissorsParameters.new(player1, player2, 100, {from: owner})
-			.then(instance => {
-				hubParametersInstance = instance;
-				return hubContractInstance.createNewSubContract(hubParametersInstance.address, {from: owner, value: 1000});
-			}).then(txObject => {
+			return hubContractInstance.createNewSubContract(player1, player2, 100, {from: owner, value: 1000})
+			.then(txObject => {
 				assert.strictEqual(1, parseInt(txObject.receipt.status), "transaction was expected to be successfull.");
 				assert.strictEqual(1, txObject.logs.length);
 				rpsContractInstance = RockPaperScissors.at(txObject.logs[0].args.contractAddress);

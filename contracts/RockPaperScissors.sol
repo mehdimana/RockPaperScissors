@@ -1,7 +1,8 @@
 pragma solidity ^0.4.21;
-import "./RockPaperScissorsParameters.sol";
+import "./Mortal.sol";
+import "./Stoppable.sol";
 
-contract RockPaperScissors is GenericHubSubContract {
+contract RockPaperScissors is Mortal, Stoppable {
     enum GameMoves {Rock, Paper, Scissors}
     
     struct PlayerType {
@@ -42,33 +43,39 @@ contract RockPaperScissors is GenericHubSubContract {
      * create a move hash using 
      * - this so that the same pwd can be reused across instances of this contract, 
      * - gameHash so that a pwd can be reused accross games
-     * - owner so that a pwd can be reused accross players
+     * - player so that a pwd can be reused accross players
      * - the move
      */
-    function calculateMovesHash(address owner, bytes32 pwd, GameMoves move) 
+    function calculateMovesHash(address player, bytes32 pwd, GameMoves move) 
             public 
             view 
             returns(bytes32 hash) 
     {
-        return keccak256(this, owner, pwd, move); 
+        return keccak256(this, player, pwd, move); 
     }
     
     /**
      * constructor: create a new game
-     * @param trustedParamers needed parameters for creating this contract
+     * @param _player1Address player1
+     * @param _player2Address player2
+     * @param _stake the stake of the game
      */
-    function RockPaperScissors(RockPaperScissorsParameters trustedParamers) 
+    function RockPaperScissors(address _player1Address, address _player2Address, uint _stake) 
             public 
             onlyIfrunning 
             accessibleByOwnerOnly
     { 
-        stake = trustedParamers.getStake();
+        require(_player1Address != address(0));
+        require(_player2Address != address(0)); // we expect two real players.
+        require(_player1Address != _player2Address); // we expect # players
+        
+        stake = _stake;
         //gameFinished = false; //save gas
-        player1.playerAddress = trustedParamers.getPlayer1Address();
+        player1.playerAddress = _player1Address;
         //players1.hasReclaimed = false;  //save gas
         //players1.hasRevealed = false;  //save gas
         
-        player2.playerAddress = trustedParamers.getPlayer2Address();
+        player2.playerAddress = _player2Address;
        // players2.hasReclaimed = false; //save gas
         //players2.hasRevealed = false;  //save gas
         
@@ -92,7 +99,7 @@ contract RockPaperScissors is GenericHubSubContract {
     function getOtherPlayer() 
             internal 
             view 
-            returns(PlayerType storage actualPlayer) 
+            returns(PlayerType storage otherPlayer) 
     {
         if (player1.playerAddress == msg.sender) {
             return player2;

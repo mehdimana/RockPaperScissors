@@ -6,8 +6,6 @@ const $ = require("jquery");
 // Not to forget our built contract
 const rockPaperScissorsHub = require("../../build/contracts/RockPaperScissorsHub.json");
 const rockPaperScissors = require("../../build/contracts/RockPaperScissors.json");
-const rockPaperScissorsParameters = require("../../build/contracts/RockPaperScissorsParameters.json");
-const genericHubSubContractParameters = require("../../build/contracts/GenericHubSubContractParameters.json");
 
 // Supports Mist, and other wallets that provide 'web3'.
 if (typeof web3 !== 'undefined') {
@@ -23,9 +21,6 @@ Promise.promisifyAll(web3.version, { suffix: "Promise" });
 
 const RockPaperScissorsHub = truffleContract(rockPaperScissorsHub);
 RockPaperScissorsHub.setProvider(web3.currentProvider);
-
-const RockPaperScissorsParameters = truffleContract(rockPaperScissorsParameters);
-RockPaperScissorsParameters.setProvider(web3.currentProvider);
 
 const RockPaperScissors = truffleContract(rockPaperScissors);
 RockPaperScissors.setProvider(web3.currentProvider);
@@ -156,30 +151,26 @@ const watchEvent = function(event) {
 const createGame = function() {  
   var params;
   var deployed;
-  return RockPaperScissorsParameters.new($("#first-player-select").val(),
-                                         $("#second-player-select").val(), 
-                                         $("input[name='stake']").val(), 
-                                         {from: $("#account-select").val(), gas: 5000000})
-  .then(instance => {
-    params = instance.address;
-    totalGas = instance.gasUsed;
-    console.log("parameters address: " + params);
-    console.log(instance);
-    return web3.eth.getTransactionReceiptPromise(instance.transactionHash);
-  }).then(txObject =>{
-    totalGas = txObject.gasUsed;
-    return RockPaperScissorsHub.deployed();    
-  }).then( deploy => {
+  console.log(1);
+  return RockPaperScissorsHub.deployed()
+  .then(deploy => {
     deployed = deploy;
-    console.log(deployed);
-    return deployed.createNewSubContract.estimateGas(params, {from: $("#account-select").val(), gas: 5000000, value: 100}); 
+    return deployed.createNewSubContract.estimateGas($("#first-player-select").val(),
+                                                     $("#second-player-select").val(), 
+                                                     $("input[name='stake']").val(),
+                                                     {from: $("#account-select").val(), gas: 5000000, value: 100});
   }).then(estimatedGas => {
-    console.log(estimatedGas);
-    return deployed.createNewSubContract.sendTransaction(params, {from: $("#account-select").val(), gas: estimatedGas, value: 100});
+    return deployed.createNewSubContract.sendTransaction($("#first-player-select").val(),
+                                                         $("#second-player-select").val(), 
+                                                         $("input[name='stake']").val(), 
+                                                         {from: $("#account-select").val(), gas: estimatedGas, value: 100});
   }).then(txHash => {
+     console.log(2);
      return web3.eth.getTransactionReceiptPromise(txHash);
   }).then(txObject => {
-     updateTotalGas(txObject.gasUsed);
+    console.log(3);
+     totalGas = txObject.gasUsed;
+     updateStatus("Gas used: " + totalGas);
      console.log(txObject);
     if (txObject.status == "0x01" || txObject.status == 1) {
       updateStatus("game created successsfuly.");
