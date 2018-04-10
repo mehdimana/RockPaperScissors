@@ -18,12 +18,15 @@ contract RockPaperScissors is Mortal, Stoppable {
     
     uint public stake; //the amount each player should transfer
     bool public gameFinished; //true when the winner has reclaimed his money
+    uint public timeoutInMinutes;
+    uint public clockStartedOn;
 
-    event LogWinnerRevealed(address winner, address loser, address contractAddress);
-    event LogDrawRevealed(address player1, address player2, address contractAddress);
-    event LogClaim(uint ammount, address winner, address contractAddress);
-    event LogPlay(bytes32 move, address player, address contractAddress);
-    event LogRevealed(GameMoves move, address player, address contractAddress);
+    event LogWinnerRevealed(address winner, address loser);
+    event LogDrawRevealed(address player1, address player2);
+    event LogClaim(uint ammount, address winner);
+    event LogPlay(bytes32 move, address player);
+    event LogTimeoutClockStarted(address playerRequestedToPlayOrReveal);
+    event LogRevealed(GameMoves move, address player);
     event LogGameCreated(uint stake, address player1, address player2);
     
     // modifiers
@@ -59,8 +62,18 @@ contract RockPaperScissors is Mortal, Stoppable {
      * @param _player1Address player1
      * @param _player2Address player2
      * @param _stake the stake of the game
+     * @param _timeoutInMinutes when a first player plays, the game should finish withing this timeout
+     * when one player starts playing (send funds), the clock start ticking.
+     * if the timeout is reached:
+     * - only one player has played --> that player can recover its stake
+     * - both players have played -> the timeout is canceled.
+     * 
+     * if a player reveal --> the clock start ticking
+     * if the timeout is reached:
+     * - one player has revealed -> that player can retreive both stakes
+     * - if both players have revealed, the game is finished and the timeout has no effect.
      */
-    function RockPaperScissors(address _player1Address, address _player2Address, uint _stake) 
+    function RockPaperScissors(address _player1Address, address _player2Address, uint _stake, uint _timeoutInMinutes) 
             public 
             onlyIfrunning 
             accessibleByOwnerOnly
@@ -68,7 +81,9 @@ contract RockPaperScissors is Mortal, Stoppable {
         require(_player1Address != address(0));
         require(_player2Address != address(0)); // we expect two real players.
         require(_player1Address != _player2Address); // we expect # players
+        require(_timeoutInMinutes > 0); //or it is not possible to play
         
+        timeoutInMinutes = _timeoutInMinutes;
         stake = _stake;
         //gameFinished = false; //save gas
         player1.playerAddress = _player1Address;
@@ -128,7 +143,13 @@ contract RockPaperScissors is Mortal, Stoppable {
         require(actualPlayer.moveHashed == bytes32(0));// player has not yet hasDeposited/played
         
         actualPlayer.moveHashed = hashMove; //then he plays.
-        emit LogPlay(hashMove, msg.sender, this);
+        emit LogPlay(hashMove, msg.sender);
+        
+        PlayerType storage otherPlayer = getOtherPlayer();
+        if (otherPlayer.moveHashed == bytes32(0)) { // if other player has not yet played start the clock
+            clockStartedOn = now;
+            emit LogTimeoutClockStarted(otherPlayer.playerAddress);
+        }
         return true;
     }
     
@@ -155,56 +176,56 @@ contract RockPaperScissors is Mortal, Stoppable {
         
         actualPlayer.move = move; //then his play is revealed.
         actualPlayer.hasRevealed = true;
-        emit LogRevealed(move, msg.sender, this);
+        emit LogRevealed(move, msg.sender);
         
         //check if we have a winner
         if (otherPlayer.hasRevealed) {
             int compareResult = compare(player1.move, player2.move);
             if (compareResult == -1) { //player1 winner
-                emit LogWinnerRevealed(player1.playerAddress, player2.playerAddress, this);
+                emit LogWinnerRevealed(player1.playerAddress, player2.playerAddress);
             } else if (compareResult == 1) { //player2 is a winner
-                emit LogWinnerRevealed(player2.playerAddress, player1.playerAddress, this);
+                emit LogWinnerRevealed(player2.playerAddress, player1.playerAddress);
             } else { //a draw
-                emit LogDrawRevealed(player1.playerAddress, player2.playerAddress, this);
+                emit LogDrawRevealed(player1.playerAddress, player2.playerAddress);
             }
+        } else { // other player has not yet revealed --> sdtart clock
+            clockStartedOn = now;
+            emit LogTimeoutClockStarted(otherPlayer.playerAddress);
         }
         
         return true;
     }    
-
-    /**
-     * if there is a winner after both players have played, the winner can claim 
-     * @return true if successful
-     */
-    function claimAsWinner()
-            external 
+    
+    function claimTimeoutReached()
+            external
             gameNotFinished // game should not be finished
             gameHasStake // don't claim if no stake
             returns(bool success) 
     {
-        require(player1.hasRevealed 
-             && player2.hasRevealed); //both players should have played already
-            
         PlayerType storage actualPlayer = getCallingPlayer(); //get the current player
-        require(!actualPlayer.hasReclaimed); // this player has not reclaimed already
-         
-        int compareResult = compare(player1.move, player2.move);   
-        //sender should be the winner (if not do not call us)
-        require((compareResult == -1 && player1.playerAddress == msg.sender) //sender is player1 and has Won
-            ||  (compareResult == 1 && player2.playerAddress == msg.sender)); //sender is player2 and has won
-  
-        uint ammount = stake * 2; // this is >0 since previous require
-        gameFinished = true;//avoid re-entrency and make sure the stake is send only once
-        emit LogClaim(ammount, msg.sender, this); 
-        msg.sender.transfer(ammount);
-        return true;
+        PlayerType storage otherPlayer = getOtherPlayer();
+        if (clockStartedOn + (timeoutInMinutes * 60 seconds) > now) { //timeout reached
+            if (actualPlayer.hasRevealed && !otherPlayer.hasRevealed) { 
+                uint ammount = stake * 2;
+                gameFinished = true;//avoid re-entrency and make sure the stake is send only once
+                emit LogClaim(ammount, msg.sender); 
+                msg.sender.transfer(ammount);
+                return true;
+            } else if (actualPlayer.moveHashed != bytes32(0) && otherPlayer.moveHashed == bytes32(0)) { //sender has played, the other player not
+                gameFinished = true;//avoid re-entrency and make sure the stake is send only once
+                emit LogClaim(ammount, msg.sender); 
+                msg.sender.transfer(stake);
+                return true;
+            }
+        }
+        return false;
     }
-    
+
     /** 
-     * if it is a draw each player involved can recover their stake
+     * sender claims a draw or a win 
      * @return true if successful
      */
-    function claimDraw() 
+    function claim() 
             external 
             gameNotFinished // game should not be finished
             gameHasStake // don't claim if no stake
@@ -216,19 +237,24 @@ contract RockPaperScissors is Mortal, Stoppable {
         require(actualPlayer.hasRevealed 
              && otherPlayer.hasRevealed); //both players should have played already
              
-        require( 0 == compare(actualPlayer.move, otherPlayer.move)); //it's a draw
-
-        uint ammount = stake;
-        actualPlayer.hasReclaimed = true; //avoir re-entrency
-        if (otherPlayer.hasReclaimed) {
-            gameFinished = true; // finish the game when bothe playerss have reclaimed.
+        int compareResult = compare(actualPlayer.move, otherPlayer.move);
+        if (compareResult == 0) { //a draw
+            uint ammount = stake;
+            if (otherPlayer.hasReclaimed) {
+                gameFinished = true; // finish the game when bothe playerss have reclaimed.
+            }
+        } else if (compareResult == -1) { //actual player has won
+             ammount = stake * 2;
+             gameFinished = true; //finish game when winner has claimed
+        } else { // other player has won -> actual player cannot claim
+            revert();
         }
-        
-        emit LogClaim(ammount, msg.sender, this); 
+
+        actualPlayer.hasReclaimed = true; //avoir re-entrency
+        emit LogClaim(ammount, msg.sender); 
         msg.sender.transfer(ammount);
         
         return true;
-        
     }
     
     /**

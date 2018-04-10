@@ -52,15 +52,16 @@ contract RockPaperScissorsHub is Mortal, Stoppable {
      * @param _player1Address player1
      * @param _player2Address player2
      * @param _stake the stake of the game
+     * @param _timeoutInMinutes when a first player plays, the game should finish withing this timeout
      */
-    function createNewSubContract(address _player1Address, address _player2Address, uint _stake) 
+    function createNewSubContract(address _player1Address, address _player2Address, uint _stake, uint _timeoutInMinutes) 
             onlyIfrunning
             external
             payable
             returns(address newContractAddresss)
     {
         require(subContractCreationCost == msg.value); //cost of creating a contract
-        RockPaperScissors trustedRockPaperScissors = new RockPaperScissors(_player1Address, _player2Address, _stake);
+        RockPaperScissors trustedRockPaperScissors = new RockPaperScissors(_player1Address, _player2Address, _stake, _timeoutInMinutes);
         rockPaperScissorsSubcontractsArray.push(trustedRockPaperScissors);
         rockPaperScissorsSubContractExists[trustedRockPaperScissors] = true;
         emit LogNewSubContractCreated(msg.sender, hubName, trustedRockPaperScissors);

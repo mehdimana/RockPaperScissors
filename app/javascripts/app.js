@@ -66,8 +66,7 @@ window.addEventListener('load', function() {
         .then(() => $("#create-game").click(createGame))
         .then(() => $("#play-buttont").click(playGame))
         .then(() => $("#reveal-buttont").click(reveal))
-        .then(() => $("#claim-winner-buttont").click(claimAsWinner))
-        .then(() => $("#claim-draw-buttont").click(claimDraw))
+        .then(() => $("#claim-buttont").click(claim))
         // Never let an error go unlogged.
         .catch(console.error);
 });
@@ -151,24 +150,24 @@ const watchEvent = function(event) {
 const createGame = function() {  
   var params;
   var deployed;
-  console.log(1);
+  console.log($("input[name='timeout']").val());
   return RockPaperScissorsHub.deployed()
   .then(deploy => {
     deployed = deploy;
     return deployed.createNewSubContract.estimateGas($("#first-player-select").val(),
                                                      $("#second-player-select").val(), 
                                                      $("input[name='stake']").val(),
+                                                     $("input[name='timeout']").val(),
                                                      {from: $("#account-select").val(), gas: 5000000, value: 100});
   }).then(estimatedGas => {
     return deployed.createNewSubContract.sendTransaction($("#first-player-select").val(),
                                                          $("#second-player-select").val(), 
                                                          $("input[name='stake']").val(), 
+                                                         $("input[name='timeout']").val(),
                                                          {from: $("#account-select").val(), gas: estimatedGas, value: 100});
   }).then(txHash => {
-     console.log(2);
      return web3.eth.getTransactionReceiptPromise(txHash);
   }).then(txObject => {
-    console.log(3);
      totalGas = txObject.gasUsed;
      updateStatus("Gas used: " + totalGas);
      console.log(txObject);
@@ -233,25 +232,9 @@ const reveal = function() {
   }).catch(console.error);
 }
 
-const claimDraw = function() {
+const claim = function() {
    return RockPaperScissors.at(latestGameAddress).then(instance => {
-            return  instance.claimDraw.sendTransaction({from: $("#account-select").val()});
-  }).then(txHash => {
-    return web3.eth.getTransactionReceiptPromise(txHash);
-  }).then(txObject => {
-     updateTotalGas(txObject.gasUsed);
-    if (txObject.status == "0x01" || txObject.status == 1) {
-      updateStatus("claimed successfuly.");
-    } else {
-      updateStatus("error claiming.");
-      console.error(txObject);
-    }
-  }).catch(console.error);
-}
-
-const claimAsWinner = function() {
-   return RockPaperScissors.at(latestGameAddress).then(instance => {
-            return  instance.claimAsWinner.sendTransaction({from: $("#account-select").val()});
+            return  instance.claim.sendTransaction({from: $("#account-select").val()});
   }).then(txHash => {
     return web3.eth.getTransactionReceiptPromise(txHash);
   }).then(txObject => {
